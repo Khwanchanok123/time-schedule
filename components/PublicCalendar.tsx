@@ -107,7 +107,7 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
         };
         return {
           id: s.id,
-          title: `อ.${extendedProps.teacherName} · ${extendedProps.roomName}`,
+          title: `ศจ.${extendedProps.teacherName} · ${extendedProps.roomName}`,
           start: s.start_time,
           end: s.end_time,
           backgroundColor: color,
@@ -256,7 +256,7 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
             <h3 className="mb-3 text-lg font-semibold">{selected.subject || "ตารางสอน"}</h3>
             <dl className="space-y-1.5 text-sm">
               {selected.topic && <Row label="หัวข้อ" value={selected.topic} />}
-              <Row label="อาจารย์" value={`อ.${selected.teacherName}`} />
+              <Row label="อาจารย์" value={`ศจ.${selected.teacherName}`} />
               <Row label="วันที่" value={selected.dateLabel} />
               <Row label="เวลา" value={`${selected.timeLabel} น.`} />
               <Row
@@ -307,7 +307,7 @@ function renderEvent(arg: EventContentArg) {
 
   const tooltip = [
     `${p.timeLabel} น.`,
-    `อ.${p.teacherName}`,
+    `ศจ.${p.teacherName}`,
     `ห้อง ${p.roomName}`,
     p.subject,
     p.topic && `หัวข้อ: ${p.topic}`,
@@ -325,7 +325,7 @@ function renderEvent(arg: EventContentArg) {
         title={tooltip}
       >
         <div className="truncate">
-          <b>{p.timeLabel}</b> อ.{p.teacherName} · {p.roomName}
+          <b>{p.timeLabel}</b> ศจ.{p.teacherName} · {p.roomName}
           {p.subject ? ` · ${p.subject}` : ""}
         </div>
         <Tags p={p} />
@@ -337,7 +337,7 @@ function renderEvent(arg: EventContentArg) {
     return (
       <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
         <span>
-          <b>อ.{p.teacherName}</b> — ห้อง {p.roomName}
+          <b>ศจ.{p.teacherName}</b> — ห้อง {p.roomName}
           {p.subject ? ` — ${p.subject}` : ""}
           {p.topic ? ` (${p.topic})` : ""}
         </span>
@@ -350,7 +350,7 @@ function renderEvent(arg: EventContentArg) {
   return (
     <div className="cursor-pointer p-0.5 text-[11px] leading-snug" title={tooltip}>
       <div className="font-semibold">{p.timeLabel}</div>
-      <div>อ.{p.teacherName}</div>
+      <div>ศจ.{p.teacherName}</div>
       <div>ห้อง {p.roomName}</div>
       {p.subject && <div className="italic opacity-90">{p.subject}</div>}
       {p.topic && <div className="opacity-90">หัวข้อ: {p.topic}</div>}

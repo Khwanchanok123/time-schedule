@@ -168,11 +168,31 @@ export async function ensureSchema(sql: Sql): Promise<void> {
 // เพิ่มเลขนี้เมื่อแก้โครงสร้างฐานข้อมูล เพื่อให้ ensureSchema รันใหม่โดยไม่ต้องรีสตาร์ทเซิร์ฟเวอร์ตอน dev
 const SCHEMA_VERSION = 5;
 
+/**
+ * เช็กเลขเวอร์ชันโครงสร้างที่เก็บไว้ในฐานข้อมูลก่อน (1 query) — ตรงแล้วไม่ต้องรัน SCHEMA ทั้ง 18 คำสั่ง
+ * (บน Vercel ทุกครั้งที่ฟังก์ชันเริ่มใหม่ ถ้ารันครบทุกคำสั่งทีละรอบไป Neon จะช้าหลายวินาที)
+ */
+async function ensureSchemaOnce(sql: Sql): Promise<void> {
+  try {
+    const rows = await sql.query(`SELECT value FROM app_meta WHERE key = 'schema_version'`);
+    if (Number(rows[0]?.value) === SCHEMA_VERSION) return;
+  } catch {
+    // ยังไม่มีตาราง app_meta (ฐานข้อมูลใหม่) → สร้างด้านล่าง
+  }
+  await ensureSchema(sql);
+  await sql.query(`CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+  await sql.query(
+    `INSERT INTO app_meta (key, value) VALUES ('schema_version', $1)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [String(SCHEMA_VERSION)]
+  );
+}
+
 export async function db(): Promise<Sql> {
   const sql = await getSql();
   if (!shared.schemaReady || shared.schemaVersion !== SCHEMA_VERSION) {
     shared.schemaVersion = SCHEMA_VERSION;
-    shared.schemaReady = ensureSchema(sql).catch((e) => {
+    shared.schemaReady = ensureSchemaOnce(sql).catch((e) => {
       shared.schemaReady = null;
       throw e;
     });

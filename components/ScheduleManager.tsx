@@ -304,7 +304,7 @@ export default function ScheduleManager({
         >
           <h2 className="text-lg font-semibold">{form.id ? "✏️ แก้ไขตารางสอน" : "➕ เพิ่มตารางสอน"}</h2>
           <span className="text-xs opacity-90">
-            {isAdmin ? "แอดมิน: ลงตารางให้อาจารย์คนใดก็ได้" : `ลงในนามของ อ.${currentUser.full_name}`}
+            {isAdmin ? "แอดมิน: ลงตารางให้อาจารย์คนใดก็ได้" : `ลงในนามของ ศจ.${currentUser.full_name}`}
           </span>
         </div>
 

@@ -61,13 +61,13 @@ export async function findConflicts(sql: Sql, input: ConflictInput): Promise<Con
       return {
         kind: "room" as const,
         scheduleId: r.id,
-        message: `ห้อง ${roomName} ถูกใช้แล้วโดย อ.${teacherName} เวลา ${time} (${date})`,
+        message: `ห้อง ${roomName} ถูกใช้แล้วโดย ศจ.${teacherName} เวลา ${time} (${date})`,
       };
     }
     return {
       kind: "teacher" as const,
       scheduleId: r.id,
-      message: `อ.${teacherName} มีสอนอยู่แล้วที่ห้อง ${roomName} เวลา ${time} (${date})`,
+      message: `ศจ.${teacherName} มีสอนอยู่แล้วที่ห้อง ${roomName} เวลา ${time} (${date})`,
     };
   });
 }

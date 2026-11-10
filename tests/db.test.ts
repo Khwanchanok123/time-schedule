@@ -103,7 +103,7 @@ describe("กฎการจองซ้ำ (EXCLUDE constraint ในฐาน�
 });
 
 describe("findConflicts (เช็กก่อนบันทึก ชั้นที่ 1 และ 2)", () => {
-  test("ห้องถูกใช้ → ข้อความ 'ห้อง X ถูกใช้แล้วโดย อ.Y เวลา HH:MM–HH:MM'", async () => {
+  test("ห้องถูกใช้ → ข้อความ 'ห้อง X ถูกใช้แล้วโดย ศจ.Y เวลา HH:MM–HH:MM'", async () => {
     const c = await findConflicts(sql, {
       teacherId: B,
       roomId: R1,
@@ -113,7 +113,7 @@ describe("findConflicts (เช็กก่อนบันทึก ชั้น
     // B ติดทั้งห้อง 301 (A ใช้อยู่) และติดสอนตัวเองที่ห้อง 302 เวลา 09:00–11:00 → 2 รายการ
     assert.deepEqual(c.map((x) => x.kind).sort(), ["room", "teacher"]);
     const room = c.find((x) => x.kind === "room")!;
-    assert.match(room.message, /^ห้อง 301 ถูกใช้แล้วโดย อ\.สมชาย ใจดี เวลา 09:00–12:00/);
+    assert.match(room.message, /^ห้อง 301 ถูกใช้แล้วโดย ศจ\.สมชาย ใจดี เวลา 09:00–12:00/);
   });
 
   test("อาจารย์ติดสอนห้องอื่น → แจ้งเตือนแบบ teacher", async () => {
@@ -123,7 +123,7 @@ describe("findConflicts (เช็กก่อนบันทึก ชั้น
       startISO: bkk("2030-01-15 10:00"),
       endISO: bkk("2030-01-15 11:00"),
     });
-    assert.ok(c.some((x) => x.kind === "teacher" && x.message.startsWith("อ.สมชาย ใจดี มีสอนอยู่แล้วที่ห้อง 301")));
+    assert.ok(c.some((x) => x.kind === "teacher" && x.message.startsWith("ศจ.สมชาย ใจดี มีสอนอยู่แล้วที่ห้อง 301")));
   });
 
   test("สอนต่อกันพอดี → ไม่ถือว่าซ้อน", async () => {
@@ -178,7 +178,7 @@ describe("ห้องนอกระบบ (พิมพ์ชื่อเอ�
     });
     const room = c.find((x) => x.kind === "room");
     assert.ok(room);
-    assert.match(room.message, /^ห้อง สนามควิดดิช ถูกใช้แล้วโดย อ\.สมชาย ใจดี เวลา 09:00–11:00/);
+    assert.match(room.message, /^ห้อง สนามควิดดิช ถูกใช้แล้วโดย ศจ\.สมชาย ใจดี เวลา 09:00–11:00/);
   });
 
   test("listSchedules แสดงชื่อห้องนอกระบบ (custom = true)", async () => {
