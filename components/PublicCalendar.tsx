@@ -8,7 +8,8 @@ import listPlugin from "@fullcalendar/list";
 import luxonPlugin from "@fullcalendar/luxon3";
 import thLocale from "@fullcalendar/core/locales/th";
 import type { EventContentArg, EventInput, EventSourceFuncArg } from "@fullcalendar/core";
-import { colorFor } from "@/lib/colors";
+import { colorFor, colorForSubject } from "@/lib/colors";
+import { SUBJECTS } from "@/lib/subjects";
 import { TIMEZONE, formatRange, formatThaiDate } from "@/lib/time";
 import type { Room, ScheduleWithRelations } from "@/lib/types";
 
@@ -17,7 +18,7 @@ interface Props {
   teachers: { id: string; full_name: string }[];
 }
 
-type ColorBy = "room" | "teacher";
+type ColorBy = "subject" | "room" | "teacher";
 
 interface EventProps {
   teacherName: string;
@@ -36,7 +37,7 @@ export default function PublicCalendar({ rooms, teachers }: Props) {
   const [mounted, setMounted] = useState(false);
   const [roomFilter, setRoomFilter] = useState("");
   const [teacherFilter, setTeacherFilter] = useState("");
-  const [colorBy, setColorBy] = useState<ColorBy>("room");
+  const [colorBy, setColorBy] = useState<ColorBy>("subject");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<EventProps | null>(null);
 
@@ -64,7 +65,10 @@ export default function PublicCalendar({ rooms, teachers }: Props) {
       setLoadError(null);
 
       return data.map((s) => {
-        const color = colorFor(colorBy === "room" ? (s.room_id ?? s.room_text?.toLowerCase()) : s.teacher_id);
+        const color =
+          colorBy === "subject"
+            ? colorForSubject(s.subject)
+            : colorFor(colorBy === "room" ? (s.room_id ?? s.room_text?.toLowerCase()) : s.teacher_id);
         const extendedProps: EventProps = {
           teacherName: s.teacher?.full_name ?? "ไม่ทราบชื่อ",
           roomName: s.room?.name ?? "-",
@@ -92,11 +96,16 @@ export default function PublicCalendar({ rooms, teachers }: Props) {
     [roomFilter, teacherFilter, colorBy]
   );
 
-  const legend = colorBy === "room"
-    ? rooms.filter((r) => !roomFilter || r.id === roomFilter).map((r) => ({ id: r.id, label: r.name }))
-    : teachers
-        .filter((t) => !teacherFilter || t.id === teacherFilter)
-        .map((t) => ({ id: t.id, label: t.full_name }));
+  const legend: { id: string; label: string; color: string }[] =
+    colorBy === "subject"
+      ? SUBJECTS.map((s) => ({ id: s, label: s, color: colorForSubject(s) }))
+      : colorBy === "room"
+        ? rooms
+            .filter((r) => !roomFilter || r.id === roomFilter)
+            .map((r) => ({ id: r.id, label: r.name, color: colorFor(r.id) }))
+        : teachers
+            .filter((t) => !teacherFilter || t.id === teacherFilter)
+            .map((t) => ({ id: t.id, label: t.full_name, color: colorFor(t.id) }));
 
   return (
     <div className="card space-y-3 p-2 sm:p-4">
@@ -139,6 +148,7 @@ export default function PublicCalendar({ rooms, teachers }: Props) {
             value={colorBy}
             onChange={(e) => setColorBy(e.target.value as ColorBy)}
           >
+            <option value="subject">รายวิชา</option>
             <option value="room">ห้องเรียน</option>
             <option value="teacher">อาจารย์</option>
           </select>
@@ -160,7 +170,7 @@ export default function PublicCalendar({ rooms, teachers }: Props) {
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
           {legend.map((l) => (
             <span key={l.id} className="inline-flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: colorFor(l.id) }} />
+              <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: l.color }} />
               {l.label}
             </span>
           ))}
