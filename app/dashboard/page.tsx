@@ -1,0 +1,30 @@
+import { requireUser } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { listRooms, listSchedules, listTeachers } from "@/lib/queries";
+import ScheduleManager from "@/components/ScheduleManager";
+
+export const dynamic = "force-dynamic";
+export const metadata = { title: "จัดการตารางสอน | ตารางสอนอาจารย์" };
+
+export default async function DashboardPage() {
+  const user = await requireUser();
+  const sql = await db();
+
+  // ทุกคนเห็นตารางสอนของทุกคน (อาจารย์แก้ไข/ลบได้เฉพาะของตัวเอง — ตรวจซ้ำใน server action)
+  const [rooms, schedules, teachers] = await Promise.all([
+    listRooms(sql),
+    listSchedules(sql),
+    listTeachers(sql),
+  ]);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold">จัดการตารางสอน</h1>
+        <p className="text-sm text-slate-500">เวลาทั้งหมดเป็นเวลาประเทศไทย (Asia/Bangkok)</p>
+      </div>
+
+      <ScheduleManager currentUser={user} rooms={rooms} schedules={schedules} teachers={teachers} />
+    </div>
+  );
+}
