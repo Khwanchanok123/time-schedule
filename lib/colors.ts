@@ -26,7 +26,7 @@ export function colorForSubject(subject: string | null | undefined): string {
   return i >= 0 ? SUBJECT_COLORS[i % SUBJECT_COLORS.length] : colorFor(subject);
 }
 
-/** สีคงที่ต่อ id (ห้องหรืออาจารย์คนเดิมได้สีเดิมเสมอ) */
+/** สีคงที่ต่อ id (ห้องหรือศาสตราจารย์คนเดิมได้สีเดิมเสมอ) */
 export function colorFor(id: string | null | undefined): string {
   if (!id) return "#6b7280";
   let h = 0;

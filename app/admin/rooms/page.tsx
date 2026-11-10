@@ -4,7 +4,7 @@ import { listRooms } from "@/lib/queries";
 import RoomManager from "@/components/RoomManager";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "จัดการห้องเรียน | ตารางสอนอาจารย์" };
+export const metadata = { title: "จัดการห้องเรียน | ตารางสอนศาสตราจารย์" };
 
 export default async function AdminRoomsPage() {
   await requireAdmin();

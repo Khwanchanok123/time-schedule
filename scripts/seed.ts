@@ -84,7 +84,7 @@ async function main() {
       hint: "คาบจบแล้ว — ลองแก้หัวข้อ/ที่นั่ง (ได้) และลองเปลี่ยนวันเวลา (ต้องถูกล็อก)" },
     { label: "ผ่านแล้ว", teacher: T1, room: R2, date: dayOffset(-1), start: H(13), end: H(15),
       subject: "วิชาสมุนไพรและการปรุงยา", topic: "ยาแก้หวัดขั้นพื้นฐาน", seats: 15,
-      hint: "คาบของอาจารย์คนอื่น — อาจารย์ทั่วไปต้องแก้/ลบไม่ได้" },
+      hint: "คาบของศาสตราจารย์คนอื่น — ศาสตราจารย์ทั่วไปต้องแก้/ลบไม่ได้" },
     { label: "ผ่านแล้ว", teacher: me.id, roomText: CUSTOM, date: dayOffset(-1), start: H(15), end: H(16, 30),
       subject: "วิชาการบินไม้กวาดและม้า", topic: "การทรงตัวบนไม้กวาด", seats: 12,
       hint: "คาบห้องนอกระบบที่จบแล้ว" },
@@ -98,7 +98,7 @@ async function main() {
       hint: "คาบกำลังสอน — ลองขยายเวลาสิ้นสุดเกินเวลาเริ่มของคาบถัดไปในห้องนี้ (ต้องชน), ลองแก้เวลาเริ่ม (ต้องถูกล็อก)" },
     { label: "กำลังสอน", teacher: T1, room: R2, date: today, start: nowMin - 30, end: nowMin + 60,
       subject: "วิชาสัตว์วิทยา", topic: "การดูแลฮิปโปกริฟฟ์", seats: 18,
-      hint: "คาบกำลังสอนของอาจารย์คนอื่น" },
+      hint: "คาบกำลังสอนของศาสตราจารย์คนอื่น" },
 
     // ===== กำลังจะถึง =====
     { label: "กำลังจะถึง (ต่อจากคาบที่กำลังสอน)", teacher: T2, room: R1, date: today, start: nowMin + 90, end: nowMin + 150,
@@ -115,10 +115,10 @@ async function main() {
       hint: "ลองย้ายคาบ 09:00 ของคุณมาห้องนี้ (ต้องชนห้อง)" },
     { label: "กำลังจะถึง", teacher: me.id, room: R3, date: dayOffset(2), start: H(10), end: H(12),
       subject: "วิชาพยากรณ์ศาสตร์", topic: "บทที่ 2 ลูกแก้วพยากรณ์", seats: 20,
-      hint: "ลองย้ายคาบอื่นของคุณมาวันนี้ 10:30 ห้องอื่น (ต้องชนแบบอาจารย์)" },
+      hint: "ลองย้ายคาบอื่นของคุณมาวันนี้ 10:30 ห้องอื่น (ต้องชนแบบศาสตราจารย์)" },
     { label: "กำลังจะถึง (นอกระบบ)", teacher: me.id, roomText: CUSTOM, date: dayOffset(2), start: H(14), end: H(16),
       subject: "วิชาการบินไม้กวาดและม้า", topic: "บินผ่านห่วง", seats: 10,
-      hint: "ลองให้อาจารย์คนอื่นจองห้องนอกระบบชื่อเดียวกันเวลาซ้อน (ต้องชน)" },
+      hint: "ลองให้ศาสตราจารย์คนอื่นจองห้องนอกระบบชื่อเดียวกันเวลาซ้อน (ต้องชน)" },
     { label: "กำลังจะถึง", teacher: T2, room: R2, date: dayOffset(7), start: H(13), end: H(15),
       subject: "วิชาประวัติศาสตร์", topic: "ประวัติโรงเรียนเวทมนตร์", seats: 40, open: false,
       hint: "สัปดาห์หน้า / ยังไม่เปิดลงทะเบียน" },
@@ -146,11 +146,11 @@ async function main() {
 
   console.log(`\nเพิ่มข้อมูลทดสอบ ${added} คาบ`);
   console.log(`ห้องที่ใช้: ${R1.name}, ${R2.name}, ${R3.name}, ${CUSTOM}`);
-  console.log(`บัญชีอาจารย์ทดสอบ: artemis / ${PASSWORD} , orion / ${PASSWORD}`);
+  console.log(`บัญชีศาสตราจารย์ทดสอบ: artemis / ${PASSWORD} , orion / ${PASSWORD}`);
   await pg.close();
 }
 
-/** วันที่มี 10 คาบ (3 วันข้างหน้า) — ไว้ดูการแสดงผลตอนวันเดียวมีคาบเยอะ ๆ และหลายคาบเวลาซ้อนกัน (คนละห้อง/คนละอาจารย์) */
+/** วันที่มี 10 คาบ (3 วันข้างหน้า) — ไว้ดูการแสดงผลตอนวันเดียวมีคาบเยอะ ๆ และหลายคาบเวลาซ้อนกัน (คนละห้อง/คนละศาสตราจารย์) */
 async function seedBusyDay(pg: PGlite, sql: ReturnType<typeof pgliteSql>, tag: string) {
   const [me] = await sql`SELECT id FROM users ORDER BY (role = 'admin') DESC, created_at LIMIT 1`;
   if (!me) throw new Error("ยังไม่มีผู้ใช้ในระบบ — เปิดเว็บแล้วสร้างแอดมินคนแรกก่อน");
@@ -177,7 +177,7 @@ async function seedBusyDay(pg: PGlite, sql: ReturnType<typeof pgliteSql>, tag: s
   const today = isoToBangkokDate(new Date());
   const day = isoToBangkokDate(new Date(new Date(`${today}T12:00:00+07:00`).getTime() + 3 * 86400000));
 
-  // [อาจารย์, ห้องในระบบ | ชื่อห้องนอกระบบ, เริ่ม, จบ, วิชา, หัวข้อ, ที่นั่ง, เปิดลงทะเบียน]
+  // [ศาสตราจารย์, ห้องในระบบ | ชื่อห้องนอกระบบ, เริ่ม, จบ, วิชา, หัวข้อ, ที่นั่ง, เปิดลงทะเบียน]
   const rows: [string, { id: string } | string, string, string, string, string, number, boolean][] = [
     [A, R1, "08:00", "09:30", "วิชาเวทมนต์คาถา", "คาถาจุดไฟขั้นพื้นฐาน", 25, true],
     [B, R2, "08:00", "10:00", "วิชาสัตว์วิทยา", "มังกรตัวน้อยและการเลี้ยงดู", 18, true],

@@ -158,7 +158,7 @@ export default function UserManager({ users, meId }: { users: UserRow[]; meId: s
                     {u.role === "admin" ? (
                       <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">แอดมิน</span>
                     ) : (
-                      <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">อาจารย์</span>
+                      <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">ศาสตราจารย์</span>
                     )}
                   </td>
                   <td className="py-2 pr-3">{u.schedule_count}</td>

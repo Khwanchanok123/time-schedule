@@ -24,7 +24,7 @@ export interface Conflict {
  * หารายการที่ทับซ้อน
  * เงื่อนไขทับซ้อน: start ใหม่ < end เดิม AND end ใหม่ > start เดิม
  * - ห้องเดียวกัน หรือ
- * - อาจารย์คนเดียวกัน (แม้ต่างห้อง)
+ * - ศาสตราจารย์คนเดียวกัน (แม้ต่างห้อง)
  */
 export async function findConflicts(sql: Sql, input: ConflictInput): Promise<Conflict[]> {
   const { teacherId, startISO, endISO } = input;
@@ -79,7 +79,7 @@ export function dbErrorToThai(e: unknown): string {
   if (err.code === "23P01") {
     if (text.includes("schedules_no_room_overlap") || text.includes("schedules_no_custom_room_overlap"))
       return "ห้องนี้ถูกจองในช่วงเวลาดังกล่าวแล้ว (มีผู้บันทึกก่อนหน้าคุณ)";
-    if (text.includes("schedules_no_teacher_overlap")) return "อาจารย์มีตารางสอนช่วงเวลานี้อยู่แล้ว";
+    if (text.includes("schedules_no_teacher_overlap")) return "ศาสตราจารย์มีตารางสอนช่วงเวลานี้อยู่แล้ว";
     return "ช่วงเวลาทับซ้อนกับรายการอื่น";
   }
   if (err.code === "23514") return "เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม";

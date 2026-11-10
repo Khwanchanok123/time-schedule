@@ -14,7 +14,7 @@ export default function LoginForm({ needsSetup, next }: { needsSetup: boolean; n
       <p className="mb-5 text-sm text-slate-500">
         {needsSetup
           ? "ยังไม่มีผู้ใช้ในระบบ บัญชีที่สร้างตอนนี้จะเป็นแอดมิน"
-          : "สำหรับอาจารย์และผู้ดูแลระบบ"}
+          : "สำหรับศาสตราจารย์และผู้ดูแลระบบ"}
       </p>
 
       <form action={formAction} className="space-y-4">
@@ -67,7 +67,7 @@ export default function LoginForm({ needsSetup, next }: { needsSetup: boolean; n
 
       {!needsSetup && (
         <p className="mt-4 text-center text-xs text-slate-500">
-          ยังไม่มีบัญชี? ติดต่อผู้ดูแลระบบเพื่อสร้างบัญชีอาจารย์
+          ยังไม่มีบัญชี? ติดต่อผู้ดูแลระบบเพื่อสร้างบัญชีศาสตราจารย์
         </p>
       )}
     </div>

@@ -142,12 +142,12 @@ export default function HistoryView({ schedules, teachers, rooms, currentUserId 
             className="input"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="ชื่ออาจารย์, ห้อง, วิชา, หัวข้อ…"
+            placeholder="ชื่อศาสตราจารย์, ห้อง, วิชา, หัวข้อ…"
           />
         </div>
         <div className="min-w-[160px] flex-1">
           <label className="label" htmlFor="h-teacher">
-            อาจารย์
+            ศาสตราจารย์
           </label>
           <select id="h-teacher" className="input" value={teacher} onChange={(e) => setTeacher(e.target.value)}>
             <option value="">ทุกคน</option>
@@ -240,7 +240,7 @@ export default function HistoryView({ schedules, teachers, rooms, currentUserId 
                   <th className="py-2 pr-3 font-medium">สถานะ</th>
                   <th className="py-2 pr-3 font-medium">วันที่</th>
                   <th className="py-2 pr-3 font-medium">เวลา</th>
-                  <th className="py-2 pr-3 font-medium">อาจารย์</th>
+                  <th className="py-2 pr-3 font-medium">ศาสตราจารย์</th>
                   <th className="py-2 pr-3 font-medium">ห้อง</th>
                   <th className="py-2 pr-3 font-medium">วิชา / หัวข้อ</th>
                   <th className="py-2 pr-3 font-medium">ที่นั่ง</th>

@@ -4,7 +4,7 @@ import { listRooms, listSchedules, listTeachers } from "@/lib/queries";
 import ScheduleManager from "@/components/ScheduleManager";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "จัดการตารางสอน | ตารางสอนอาจารย์" };
+export const metadata = { title: "จัดการตารางสอน | ตารางสอนศาสตราจารย์" };
 
 export default async function DashboardPage({
   searchParams,
@@ -18,7 +18,7 @@ export default async function DashboardPage({
   const initialTime = initialDate && /^\d{2}:\d{2}$/.test(sp.time ?? "") ? sp.time : undefined;
   const sql = await db();
 
-  // ทุกคนเห็นตารางสอนของทุกคน (อาจารย์แก้ไข/ลบได้เฉพาะของตัวเอง — ตรวจซ้ำใน server action)
+  // ทุกคนเห็นตารางสอนของทุกคน (ศาสตราจารย์แก้ไข/ลบได้เฉพาะของตัวเอง — ตรวจซ้ำใน server action)
   const [rooms, schedules, teachers] = await Promise.all([
     listRooms(sql),
     listSchedules(sql),

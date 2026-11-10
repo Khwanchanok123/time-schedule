@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import LoginForm from "./LoginForm";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "เข้าสู่ระบบ | ตารางสอนอาจารย์" };
+export const metadata = { title: "เข้าสู่ระบบ | ตารางสอนศาสตราจารย์" };
 
 export default async function LoginPage({
   searchParams,

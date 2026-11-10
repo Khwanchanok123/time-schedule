@@ -120,14 +120,14 @@ export const SCHEMA: string[] = [
     -- ห้องเดียวกันห้ามเวลาทับซ้อน: '[)' = start ใหม่ < end เดิม AND end ใหม่ > start เดิม
     CONSTRAINT schedules_no_room_overlap
       EXCLUDE USING gist (room_id WITH =, tstzrange(start_time, end_time, '[)') WITH &&),
-    -- อาจารย์คนเดียวกันห้ามสอนเวลาทับซ้อน แม้ต่างห้อง
+    -- ศาสตราจารย์คนเดียวกันห้ามสอนเวลาทับซ้อน แม้ต่างห้อง
     CONSTRAINT schedules_no_teacher_overlap
       EXCLUDE USING gist (teacher_id WITH =, tstzrange(start_time, end_time, '[)') WITH &&)
   )`,
 
   // หัวข้อที่จะเรียนในคาบนั้น (เพิ่มภายหลัง — แถวเก่าเป็น NULL ได้ แอปบังคับกรอกสำหรับรายการใหม่)
   `ALTER TABLE schedules ADD COLUMN IF NOT EXISTS topic TEXT`,
-  // สถานะเปิดให้ลงทะเบียน (อาจารย์ติ๊กเอง) + รายละเอียดการลงทะเบียน
+  // สถานะเปิดให้ลงทะเบียน (ศาสตราจารย์ติ๊กเอง) + รายละเอียดการลงทะเบียน
   `ALTER TABLE schedules ADD COLUMN IF NOT EXISTS registration_open BOOLEAN NOT NULL DEFAULT false`,
   `ALTER TABLE schedules ADD COLUMN IF NOT EXISTS registration_note TEXT`, // เลิกใช้แล้ว (เก็บไว้ไม่ให้ข้อมูลเก่าหาย)
   // จำนวนที่นั่ง = จำกัดจำนวนคนลงทะเบียนของคาบนั้น

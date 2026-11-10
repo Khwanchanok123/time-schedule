@@ -277,7 +277,7 @@ export default function ScheduleManager({
 
   const canSubmit = !isPending && !checking && !timeError && conflicts.length === 0 && roomChosen && !!form.subject && !!form.topic.trim() && !seatsError;
 
-  /** อาจารย์จัดการได้เฉพาะคาบของตัวเอง แอดมินจัดการได้ทุกคาบ */
+  /** ศาสตราจารย์จัดการได้เฉพาะคาบของตัวเอง แอดมินจัดการได้ทุกคาบ */
   const canManage = (s: ScheduleWithRelations) => isAdmin || s.teacher_id === currentUser.id;
   const myCount = schedules.filter((s) => s.teacher_id === currentUser.id && inView(s)).length;
 
@@ -304,7 +304,7 @@ export default function ScheduleManager({
         >
           <h2 className="text-lg font-semibold">{form.id ? "✏️ แก้ไขตารางสอน" : "➕ เพิ่มตารางสอน"}</h2>
           <span className="text-xs opacity-90">
-            {isAdmin ? "แอดมิน: ลงตารางให้อาจารย์คนใดก็ได้" : `ลงในนามของ ศจ.${currentUser.full_name}`}
+            {isAdmin ? "แอดมิน: ลงตารางให้ศาสตราจารย์คนใดก็ได้" : `ลงในนามของ ศจ.${currentUser.full_name}`}
           </span>
         </div>
 
@@ -319,7 +319,7 @@ export default function ScheduleManager({
           {isAdmin && (
             <div>
               <label className="label" htmlFor="teacher">
-                อาจารย์
+                ศาสตราจารย์
               </label>
               <select
                 id="teacher"
@@ -585,9 +585,9 @@ export default function ScheduleManager({
               className="input w-auto py-1.5"
               value={teacherFilter}
               onChange={(e) => setTeacherFilter(e.target.value)}
-              aria-label="กรองตามอาจารย์"
+              aria-label="กรองตามศาสตราจารย์"
             >
-              <option value="">อาจารย์ทุกคน</option>
+              <option value="">ศาสตราจารย์ทุกคน</option>
               {teachers.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.full_name}
@@ -653,7 +653,7 @@ export default function ScheduleManager({
                 <tr className="border-b border-slate-200 text-left text-slate-500">
                   <th className="py-2 pr-3 font-medium">วันที่</th>
                   <th className="py-2 pr-3 font-medium">เวลา</th>
-                  <th className="py-2 pr-3 font-medium">อาจารย์</th>
+                  <th className="py-2 pr-3 font-medium">ศาสตราจารย์</th>
                   <th className="py-2 pr-3 font-medium">ห้อง</th>
                   <th className="py-2 pr-3 font-medium">วิชา / หัวข้อ</th>
                   <th className="py-2 pr-3 font-medium">ลงทะเบียน</th>

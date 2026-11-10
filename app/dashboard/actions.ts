@@ -116,7 +116,7 @@ export async function saveScheduleAction(input: ScheduleInput): Promise<ActionRe
   let teacherId = user.id;
   if (isAdmin && isUuid(input.teacherId)) {
     const [t] = await sql`SELECT id FROM users WHERE id = ${input.teacherId}`;
-    if (!t) return { ok: false, error: "ไม่พบอาจารย์ที่เลือก" };
+    if (!t) return { ok: false, error: "ไม่พบศาสตราจารย์ที่เลือก" };
     teacherId = input.teacherId;
   }
 

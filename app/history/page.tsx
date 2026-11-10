@@ -4,7 +4,7 @@ import { listRooms, listSchedules, listTeachers } from "@/lib/queries";
 import HistoryView from "@/components/HistoryView";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "ประวัติตารางสอน | ตารางสอนอาจารย์" };
+export const metadata = { title: "ประวัติตารางสอน | ตารางสอนศาสตราจารย์" };
 
 /** ประวัติตารางสอนทั้งหมดในระบบ (ผ่านมาแล้ว / กำลังสอน / กำลังจะถึง) — ทุกคนที่ล็อกอินดูได้ */
 export default async function HistoryPage() {

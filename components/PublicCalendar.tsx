@@ -149,14 +149,14 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
           </select>
         </div>
         <div className="min-w-[180px] flex-1">
-          <label className="label" htmlFor="f-teacher">อาจารย์</label>
+          <label className="label" htmlFor="f-teacher">ศาสตราจารย์</label>
           <select
             id="f-teacher"
             className="input"
             value={teacherFilter}
             onChange={(e) => setTeacherFilter(e.target.value)}
           >
-            <option value="">อาจารย์ทุกคน</option>
+            <option value="">ศาสตราจารย์ทุกคน</option>
             {teachers.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.full_name}
@@ -174,7 +174,7 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
           >
             <option value="subject">รายวิชา</option>
             <option value="room">ห้องเรียน</option>
-            <option value="teacher">อาจารย์</option>
+            <option value="teacher">ศาสตราจารย์</option>
           </select>
         </div>
         {(roomFilter || teacherFilter) && (
@@ -256,7 +256,7 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
             <h3 className="mb-3 text-lg font-semibold">{selected.subject || "ตารางสอน"}</h3>
             <dl className="space-y-1.5 text-sm">
               {selected.topic && <Row label="หัวข้อ" value={selected.topic} />}
-              <Row label="อาจารย์" value={`ศจ.${selected.teacherName}`} />
+              <Row label="ศาสตราจารย์" value={`ศจ.${selected.teacherName}`} />
               <Row label="วันที่" value={selected.dateLabel} />
               <Row label="เวลา" value={`${selected.timeLabel} น.`} />
               <Row

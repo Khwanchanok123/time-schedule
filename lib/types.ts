@@ -28,7 +28,7 @@ export interface Schedule {
   seats: number | null; // จำนวนที่นั่ง (จำกัดคนลงทะเบียน)
 }
 
-/** ตารางสอนพร้อมชื่ออาจารย์และชื่อห้อง (ใช้แสดงผล) */
+/** ตารางสอนพร้อมชื่อศาสตราจารย์และชื่อห้อง (ใช้แสดงผล) */
 export interface ScheduleWithRelations extends Schedule {
   teacher: { id: string; full_name: string } | null;
   /** ห้องในระบบ หรือห้องนอกระบบ (id = null, custom = true) — null = ห้องถูกลบ */

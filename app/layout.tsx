@@ -12,8 +12,8 @@ const sarabun = Sarabun({
 });
 
 export const metadata: Metadata = {
-  title: "ตารางสอนอาจารย์",
-  description: "ระบบลงเวลาสอนและจองห้องเรียนของอาจารย์",
+  title: "ตารางสอนศาสตราจารย์",
+  description: "ระบบลงเวลาสอนและจองห้องเรียนของศาสตราจารย์",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

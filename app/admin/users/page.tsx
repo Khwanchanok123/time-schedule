@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import UserManager, { type UserRow } from "@/components/UserManager";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "จัดการผู้ใช้ | ตารางสอนอาจารย์" };
+export const metadata = { title: "จัดการผู้ใช้ | ตารางสอนศาสตราจารย์" };
 
 export default async function AdminUsersPage() {
   const me = await requireAdmin();
@@ -17,7 +17,7 @@ export default async function AdminUsersPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">จัดการผู้ใช้</h1>
-        <p className="text-sm text-slate-500">สร้างบัญชีให้อาจารย์ แล้วแจ้งชื่อผู้ใช้และรหัสผ่านให้อาจารย์ไปเข้าสู่ระบบ</p>
+        <p className="text-sm text-slate-500">สร้างบัญชีให้ศาสตราจารย์ แล้วแจ้งชื่อผู้ใช้และรหัสผ่านให้ศาสตราจารย์ไปเข้าสู่ระบบ</p>
       </div>
       <UserManager users={users} meId={me.id} />
     </div>
