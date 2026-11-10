@@ -223,6 +223,8 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
             locale={thLocale}
             timeZone={TIMEZONE}
             initialView="dayGridMonth"
+            // คาบข้ามคืน (เช่น 22:00–02:00) แสดงอยู่ในวันที่เริ่มวันเดียว ไม่ลากไปวันถัดไปในมุมมองเดือน
+            nextDayThreshold="12:00"
             headerToolbar={{
               left: "prev,next today",
               center: "title",

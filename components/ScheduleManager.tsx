@@ -17,7 +17,14 @@ import { checkTimeEdit, lockedFields } from "@/lib/schedule-rules";
 
 /** ค่าพิเศษใน dropdown ห้อง = ห้องนอกระบบ (ต้องตรงกับใน app/dashboard/actions.ts) */
 const CUSTOM_ROOM = "__custom__";
-import { formatRange, formatThaiDate, formatTime, isoToBangkokDate, todayBangkok } from "@/lib/time";
+import {
+  bangkokRangeToISO,
+  formatRange,
+  formatThaiDate,
+  formatTime,
+  isoToBangkokDate,
+  todayBangkok,
+} from "@/lib/time";
 
 interface Props {
   currentUser: User;
@@ -31,7 +38,7 @@ interface Props {
 
 const addMinutes = (hhmm: string, mins: number) => {
   const [h, m] = hhmm.split(":").map(Number);
-  const t = Math.min(h * 60 + m + mins, 23 * 60 + 55);
+  const t = (h * 60 + m + mins) % (24 * 60); // เลยเที่ยงคืนได้ (คาบข้ามคืน)
   return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
 };
 
@@ -123,14 +130,21 @@ export default function ScheduleManager({
         endMs: new Date(originalSchedule.end_time).getTime(),
       }
     : null;
-  const toMs = (time: string) =>
-    form.date && time ? new Date(`${form.date}T${time}:00+07:00`).getTime() : NaN;
   const locked = lockedFields(original, clock);
 
-  const timeError =
-    form.date && form.startTime && form.endTime
-      ? checkTimeEdit({ original, startMs: toMs(form.startTime), endMs: toMs(form.endTime), now: clock })
-      : null;
+  // เวลาสิ้นสุดน้อยกว่าเวลาเริ่ม = สิ้นสุดวันถัดไป (ตรงกับฝั่ง server)
+  const range = useMemo(() => {
+    if (!form.date || !form.startTime || !form.endTime) return null;
+    try {
+      const r = bangkokRangeToISO(form.date, form.startTime, form.endTime);
+      return { startMs: new Date(r.startISO).getTime(), endMs: new Date(r.endISO).getTime() };
+    } catch {
+      return { startMs: NaN, endMs: NaN };
+    }
+  }, [form.date, form.startTime, form.endTime]);
+  const endsNextDay = !!form.startTime && !!form.endTime && form.endTime < form.startTime;
+
+  const timeError = range ? checkTimeEdit({ original, ...range, now: clock }) : null;
 
   // ---------- จำนวนที่นั่ง: ต้องเป็นจำนวนเต็ม ≥ 1 ----------
   const seatsNum = Number(form.seats);
@@ -375,6 +389,9 @@ export default function ScheduleManager({
               </div>
             </div>
             {timeError && <p className="mt-1 text-sm text-red-600">{timeError}</p>}
+            {!timeError && endsNextDay && (
+              <p className="mt-1 text-sm text-amber-700">สิ้นสุดวันถัดไป (คาบข้ามคืน)</p>
+            )}
           </div>
 
           <div>

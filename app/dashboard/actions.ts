@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db, toIso, type Sql } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { bangkokToISO } from "@/lib/time";
+import { bangkokRangeToISO } from "@/lib/time";
 import { dbErrorToThai, findConflicts, type Conflict } from "@/lib/conflicts";
 import { isUuid } from "@/lib/queries";
 import { isSubject } from "@/lib/subjects";
@@ -35,8 +35,7 @@ function parseTimes(
   if (!TIME_RE.test(input.startTime ?? "") || !TIME_RE.test(input.endTime ?? ""))
     return { error: "กรุณาระบุเวลาเริ่มและเวลาสิ้นสุด" };
   try {
-    const startISO = bangkokToISO(input.date, input.startTime);
-    const endISO = bangkokToISO(input.date, input.endTime);
+    const { startISO, endISO } = bangkokRangeToISO(input.date, input.startTime, input.endTime);
     if (new Date(endISO) <= new Date(startISO)) return { error: "เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม" };
     return { startISO, endISO };
   } catch {

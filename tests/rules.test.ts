@@ -5,6 +5,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { checkTimeEdit, lockedFields, phaseOf } from "@/lib/schedule-rules";
+import { bangkokRangeToISO, formatRange } from "@/lib/time";
 
 // "ตอนนี้" = 10 พ.ย. 2030 เวลา 10:00 น. (ไทย)
 const at = (hhmm: string, day = "2030-11-10") => new Date(`${day}T${hhmm}:00+07:00`).getTime();
@@ -110,4 +111,30 @@ describe("ช่องที่ล็อกในฟอร์ม", () => {
     assert.deepEqual(lockedFields({ startMs: at("07:00"), endMs: at("09:00") }, NOW), {
       phase: "past", date: true, start: true, end: true,
     }));
+});
+
+describe("คาบข้ามคืน (bangkokRangeToISO)", () => {
+  test("23:00–00:00 → สิ้นสุดเที่ยงคืนของวันถัดไป", () => {
+    const r = bangkokRangeToISO("2030-11-10", "23:00", "00:00");
+    assert.equal(new Date(r.startISO).getTime(), at("23:00"));
+    assert.equal(new Date(r.endISO).getTime(), at("00:00", "2030-11-11"));
+    ok(checkTimeEdit({ startMs: at("23:00"), endMs: new Date(r.endISO).getTime(), now: NOW }));
+  });
+  test("22:30–01:15 → ข้ามวัน", () => {
+    const r = bangkokRangeToISO("2030-11-10", "22:30", "01:15");
+    assert.equal(new Date(r.endISO).getTime(), at("01:15", "2030-11-11"));
+  });
+  test("เวลาปกติไม่ข้ามวัน / เวลาเท่ากันยังถูกปฏิเสธ", () => {
+    const r = bangkokRangeToISO("2030-11-10", "09:00", "12:00");
+    assert.equal(new Date(r.endISO).getTime(), at("12:00"));
+    const same = bangkokRangeToISO("2030-11-10", "11:00", "11:00");
+    err(
+      checkTimeEdit({ startMs: new Date(same.startISO).getTime(), endMs: new Date(same.endISO).getTime(), now: NOW }),
+      /มากกว่าเวลาเริ่ม/
+    );
+  });
+  test("แสดงผลเป็นเวลาธรรมดา ไม่มี (+1 วัน)", () => {
+    const r = bangkokRangeToISO("2030-11-10", "23:00", "00:00");
+    assert.equal(formatRange(r.startISO, r.endISO), "23:00–00:00");
+  });
 });

@@ -13,6 +13,18 @@ export function bangkokToISO(date: string, time: string): string {
   return d.toISOString();
 }
 
+/**
+ * ช่วงเวลาในวันที่เลือก (เวลาไทย) → ISO string UTC
+ * ถ้าเวลาสิ้นสุดน้อยกว่าเวลาเริ่ม ถือว่าสิ้นสุดวันถัดไป (คาบข้ามคืน เช่น 23:00–00:00, 22:00–02:00)
+ * ถ้าเวลาเท่ากัน ไม่ข้ามวัน (ให้ตัวตรวจจับว่าเวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม)
+ */
+export function bangkokRangeToISO(date: string, startTime: string, endTime: string) {
+  const startISO = bangkokToISO(date, startTime);
+  let endISO = bangkokToISO(date, endTime);
+  if (endTime < startTime) endISO = new Date(new Date(endISO).getTime() + 24 * 3600 * 1000).toISOString();
+  return { startISO, endISO };
+}
+
 function parts(iso: string | Date) {
   const d = typeof iso === "string" ? new Date(iso) : iso;
   const p = new Intl.DateTimeFormat("en-GB", {
