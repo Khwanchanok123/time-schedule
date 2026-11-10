@@ -6,8 +6,16 @@ import ScheduleManager from "@/components/ScheduleManager";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "จัดการตารางสอน | ตารางสอนอาจารย์" };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string; time?: string }>;
+}) {
   const user = await requireUser();
+  // ลิงก์จากการคลิกวันในปฏิทิน: ?date=YYYY-MM-DD&time=HH:MM (รูปแบบไม่ถูกก็ไม่ใช้)
+  const sp = await searchParams;
+  const initialDate = /^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? "") ? sp.date : undefined;
+  const initialTime = initialDate && /^\d{2}:\d{2}$/.test(sp.time ?? "") ? sp.time : undefined;
   const sql = await db();
 
   // ทุกคนเห็นตารางสอนของทุกคน (อาจารย์แก้ไข/ลบได้เฉพาะของตัวเอง — ตรวจซ้ำใน server action)
@@ -24,7 +32,14 @@ export default async function DashboardPage() {
         <p className="text-sm text-slate-500">เวลาทั้งหมดเป็นเวลาประเทศไทย (Asia/Bangkok)</p>
       </div>
 
-      <ScheduleManager currentUser={user} rooms={rooms} schedules={schedules} teachers={teachers} />
+      <ScheduleManager
+        currentUser={user}
+        rooms={rooms}
+        schedules={schedules}
+        teachers={teachers}
+        initialDate={initialDate}
+        initialTime={initialTime}
+      />
     </div>
   );
 }

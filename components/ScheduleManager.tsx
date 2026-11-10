@@ -24,7 +24,16 @@ interface Props {
   rooms: Room[];
   schedules: ScheduleWithRelations[];
   teachers: { id: string; full_name: string }[];
+  /** มาจากการคลิกปฏิทิน (/dashboard?date=YYYY-MM-DD&time=HH:MM) — ใช้เป็นค่าเริ่มต้นของฟอร์มครั้งแรก */
+  initialDate?: string;
+  initialTime?: string;
 }
+
+const addMinutes = (hhmm: string, mins: number) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  const t = Math.min(h * 60 + m + mins, 23 * 60 + 55);
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+};
 
 type FormState = {
   id: string | null;
@@ -41,7 +50,14 @@ type FormState = {
   seats: string;
 };
 
-export default function ScheduleManager({ currentUser, rooms, schedules, teachers }: Props) {
+export default function ScheduleManager({
+  currentUser,
+  rooms,
+  schedules,
+  teachers,
+  initialDate,
+  initialTime,
+}: Props) {
   const isAdmin = currentUser.role === "admin";
 
   const emptyForm = (): FormState => ({
@@ -63,7 +79,21 @@ export default function ScheduleManager({ currentUser, rooms, schedules, teacher
     seats: "",
   });
 
-  const [form, setForm] = useState<FormState>(emptyForm);
+  // ฟอร์มเริ่มต้น: ถ้ามาจากการคลิกวันในปฏิทิน ใช้วัน (และเวลา) นั้น
+  const [form, setForm] = useState<FormState>(() => {
+    const f = emptyForm();
+    if (!initialDate) return f;
+    let start = initialTime;
+    if (!start) {
+      // คลิกทั้งวัน (มุมมองเดือน): วันนี้ → ชั่วโมงถัดไป, วันอื่น → 09:00
+      start = "09:00";
+      if (initialDate === todayBangkok()) {
+        const [h] = formatTime(new Date()).split(":").map(Number);
+        start = `${String(Math.min(h + 1, 23)).padStart(2, "0")}:00`;
+      }
+    }
+    return { ...f, date: initialDate, startTime: start, endTime: addMinutes(start, 60) };
+  });
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +101,8 @@ export default function ScheduleManager({ currentUser, rooms, schedules, teacher
   const [isPending, startTransition] = useTransition();
   const [showPast, setShowPast] = useState(false);
   const [teacherFilter, setTeacherFilter] = useState<string>("");
+  const [dateFrom, setDateFrom] = useState(""); // ช่วงวันที่ของรายการ (YYYY-MM-DD, ว่าง = ไม่จำกัด)
+  const [dateTo, setDateTo] = useState("");
   const formRef = useRef<HTMLDivElement>(null);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
@@ -222,24 +254,39 @@ export default function ScheduleManager({ currentUser, rooms, schedules, teacher
   }
 
   const now = Date.now();
+  // เลือกช่วงวันที่แล้ว → แสดงทุกคาบในช่วงนั้น (รวมที่ผ่านไปแล้ว) / ไม่เลือก → ใช้ติ๊ก "แสดงที่ผ่านมาแล้ว"
+  const hasRange = !!(dateFrom || dateTo);
+  const inView = (s: ScheduleWithRelations) => {
+    if (hasRange) {
+      const day = isoToBangkokDate(s.start_time);
+      return (!dateFrom || day >= dateFrom) && (!dateTo || day <= dateTo);
+    }
+    return showPast || new Date(s.end_time).getTime() >= now;
+  };
   const visibleSchedules = useMemo(() => {
     return schedules
-      .filter((s) => (showPast ? true : new Date(s.end_time).getTime() >= now))
+      .filter(inView)
       .filter((s) => (teacherFilter ? s.teacher_id === teacherFilter : true))
       .sort((a, b) =>
-        showPast
+        showPast && !hasRange
           ? b.start_time.localeCompare(a.start_time)
           : a.start_time.localeCompare(b.start_time)
       );
-  }, [schedules, showPast, teacherFilter, now]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schedules, showPast, teacherFilter, now, dateFrom, dateTo]);
 
   const canSubmit = !isPending && !checking && !timeError && conflicts.length === 0 && roomChosen && !!form.subject && !!form.topic.trim() && !seatsError;
 
   /** อาจารย์จัดการได้เฉพาะคาบของตัวเอง แอดมินจัดการได้ทุกคาบ */
   const canManage = (s: ScheduleWithRelations) => isAdmin || s.teacher_id === currentUser.id;
-  const myCount = schedules.filter(
-    (s) => s.teacher_id === currentUser.id && (showPast || new Date(s.end_time).getTime() >= now)
-  ).length;
+  const myCount = schedules.filter((s) => s.teacher_id === currentUser.id && inView(s)).length;
+
+  // ปุ่มลัดช่วงวันที่
+  const plusDays = (n: number) => isoToBangkokDate(new Date(Date.now() + n * 86400000));
+  const setRange = (from: string, to: string) => {
+    setDateFrom(from);
+    setDateTo(to);
+  };
 
   return (
     <div className="space-y-6">
@@ -548,15 +595,57 @@ export default function ScheduleManager({ currentUser, rooms, schedules, teacher
                 </option>
               ))}
             </select>
-            <label className="flex items-center gap-1.5">
-              <input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} />
+            <label className={`flex items-center gap-1.5 ${hasRange ? "text-slate-400" : ""}`}>
+              <input
+                type="checkbox"
+                checked={showPast}
+                disabled={hasRange}
+                onChange={(e) => setShowPast(e.target.checked)}
+              />
               แสดงรายการที่ผ่านมาแล้ว
             </label>
           </div>
         </div>
 
+        {/* ช่วงวันที่ */}
+        <div className="mb-4 flex flex-wrap items-end gap-3 rounded-md bg-slate-50 p-3 text-sm">
+          <div className="w-44">
+            <label className="label" htmlFor="list-from">
+              ตั้งแต่วันที่
+            </label>
+            <DatePicker id="list-from" value={dateFrom} onChange={setDateFrom} allowEmpty />
+          </div>
+          <div className="w-44">
+            <label className="label" htmlFor="list-to">
+              ถึงวันที่
+            </label>
+            <DatePicker id="list-to" value={dateTo} onChange={setDateTo} allowEmpty min={dateFrom || undefined} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-secondary py-1.5" onClick={() => setRange(todayBangkok(), todayBangkok())}>
+              วันนี้
+            </button>
+            <button type="button" className="btn-secondary py-1.5" onClick={() => setRange(todayBangkok(), plusDays(6))}>
+              7 วันข้างหน้า
+            </button>
+            <button type="button" className="btn-secondary py-1.5" onClick={() => setRange(plusDays(-7), plusDays(-1))}>
+              7 วันที่ผ่านมา
+            </button>
+            {hasRange && (
+              <button type="button" className="btn-secondary py-1.5" onClick={() => setRange("", "")}>
+                ล้างช่วงวันที่
+              </button>
+            )}
+          </div>
+          {dateFrom && dateTo && dateTo < dateFrom && (
+            <p className="w-full text-amber-700">วันที่สิ้นสุดอยู่ก่อนวันที่เริ่ม — ไม่มีรายการในช่วงนี้</p>
+          )}
+        </div>
+
         {visibleSchedules.length === 0 ? (
-          <p className="py-10 text-center text-slate-500">ยังไม่มีตารางสอน</p>
+          <p className="py-10 text-center text-slate-500">
+            {hasRange ? "ไม่มีตารางสอนในช่วงวันที่ที่เลือก" : "ยังไม่มีตารางสอน"}
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[860px] text-sm">

@@ -11,7 +11,8 @@
     "test": "tsx --test tests/db.test.ts tests/rules.test.ts",
     "test:db": "tsx --test tests/db.test.ts",
     "seed": "tsx scripts/seed.ts",
-    "seed:clear": "tsx scripts/seed.ts --clear"
+    "seed:clear": "tsx scripts/seed.ts --clear",
+    "seed:busy": "tsx scripts/seed.ts --busy"
   },
   "dependencies": {
     "@fullcalendar/core": "6.1.22",

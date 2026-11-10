@@ -6,16 +6,20 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import listPlugin from "@fullcalendar/list";
 import luxonPlugin from "@fullcalendar/luxon3";
+import interactionPlugin, { type DateClickArg } from "@fullcalendar/interaction";
+import { useRouter } from "next/navigation";
 import thLocale from "@fullcalendar/core/locales/th";
 import type { EventContentArg, EventInput, EventSourceFuncArg } from "@fullcalendar/core";
 import { colorFor, colorForSubject } from "@/lib/colors";
 import { SUBJECTS } from "@/lib/subjects";
-import { TIMEZONE, formatRange, formatThaiDate } from "@/lib/time";
+import { TIMEZONE, formatRange, formatThaiDate, formatTime, todayBangkok } from "@/lib/time";
 import type { Room, ScheduleWithRelations } from "@/lib/types";
 
 interface Props {
   rooms: Room[];
   teachers: { id: string; full_name: string }[];
+  /** ล็อกอินแล้ว: คลิกวัน/ช่องเวลาในปฏิทิน → ไปหน้าเพิ่มคาบสอนพร้อมวันที่นั้น */
+  canAdd?: boolean;
 }
 
 type ColorBy = "subject" | "room" | "teacher";
@@ -33,8 +37,28 @@ interface EventProps {
   dateLabel: string;
 }
 
-export default function PublicCalendar({ rooms, teachers }: Props) {
+export default function PublicCalendar({ rooms, teachers, canAdd = false }: Props) {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // คลิกวัน (มุมมองเดือน) หรือช่องเวลา (มุมมองสัปดาห์/วัน) → ไปหน้าเพิ่มคาบสอน
+  // dateStr: "YYYY-MM-DD" หรือ "YYYY-MM-DDTHH:MM:SS+07:00" (เป็นเวลาไทยเพราะตั้ง timeZone ไว้)
+  const onDateClick = (arg: DateClickArg) => {
+    if (!canAdd) return;
+    const date = arg.dateStr.slice(0, 10);
+    const time = arg.allDay ? null : arg.dateStr.slice(11, 16);
+    const today = todayBangkok();
+    if (date < today || (date === today && time && time < formatTime(new Date()))) {
+      setNotice("เลือกวันเวลาที่ผ่านมาแล้วไม่ได้ — คลิกวันนี้หรือวันข้างหน้า");
+      return;
+    }
+    setNotice(null);
+    router.push(`/dashboard?date=${date}${time ? `&time=${time}` : ""}`);
+  };
+  // ช่องวันที่ยังไม่ผ่าน: ขึ้นเมาส์เป็นรูปมือ + ไฮไลต์ตอนชี้ (arg.date เป็นวันที่ไทยแบบ UTC-coerced)
+  const dayCellClassNames = (arg: { date: Date }) =>
+    canAdd && arg.date.toISOString().slice(0, 10) >= todayBangkok() ? ["cursor-pointer", "hover:bg-blue-50"] : [];
   const [roomFilter, setRoomFilter] = useState("");
   const [teacherFilter, setTeacherFilter] = useState("");
   const [colorBy, setColorBy] = useState<ColorBy>("subject");
@@ -177,6 +201,13 @@ export default function PublicCalendar({ rooms, teachers }: Props) {
         </div>
       )}
 
+      {canAdd && (
+        <p className="text-sm text-blue-700">
+          💡 คลิกวันที่ (หรือช่องเวลาในมุมมองสัปดาห์/วัน) เพื่อเพิ่มคาบสอนในวันนั้น
+        </p>
+      )}
+      {notice && <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{notice}</p>}
+
       {loadError && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
           โหลดข้อมูลไม่สำเร็จ: {loadError}
@@ -186,7 +217,9 @@ export default function PublicCalendar({ rooms, teachers }: Props) {
       <div>
         {mounted ? (
           <FullCalendar
-            plugins={[dayGridPlugin, timeGridPlugin, listPlugin, luxonPlugin]}
+            plugins={[dayGridPlugin, timeGridPlugin, listPlugin, luxonPlugin, interactionPlugin]}
+            dateClick={onDateClick}
+            dayCellClassNames={dayCellClassNames}
             locale={thLocale}
             timeZone={TIMEZONE}
             initialView="dayGridMonth"

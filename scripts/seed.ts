@@ -23,9 +23,12 @@ async function main() {
   const sql = pgliteSql(pg);
   await ensureSchema(sql);
 
-  const removed = await sql`DELETE FROM schedules WHERE note LIKE ${TAG + "%"} RETURNING id`;
+  const busyOnly = process.argv.includes("--busy");
+  const BUSY_TAG = `${TAG} [วันแน่น]`;
+  const removed = await sql`DELETE FROM schedules WHERE note LIKE ${(busyOnly ? BUSY_TAG : TAG) + "%"} RETURNING id`;
   console.log(`ลบข้อมูลทดสอบเดิม ${removed.length} คาบ`);
   if (clearOnly) return pg.close();
+  if (busyOnly) return seedBusyDay(pg, sql, BUSY_TAG);
 
   // ---------- ผู้ใช้ ----------
   const [me] = await sql`SELECT id, full_name FROM users ORDER BY (role = 'admin') DESC, created_at LIMIT 1`;
@@ -144,6 +147,67 @@ async function main() {
   console.log(`\nเพิ่มข้อมูลทดสอบ ${added} คาบ`);
   console.log(`ห้องที่ใช้: ${R1.name}, ${R2.name}, ${R3.name}, ${CUSTOM}`);
   console.log(`บัญชีอาจารย์ทดสอบ: artemis / ${PASSWORD} , orion / ${PASSWORD}`);
+  await pg.close();
+}
+
+/** วันที่มี 10 คาบ (3 วันข้างหน้า) — ไว้ดูการแสดงผลตอนวันเดียวมีคาบเยอะ ๆ และหลายคาบเวลาซ้อนกัน (คนละห้อง/คนละอาจารย์) */
+async function seedBusyDay(pg: PGlite, sql: ReturnType<typeof pgliteSql>, tag: string) {
+  const [me] = await sql`SELECT id FROM users ORDER BY (role = 'admin') DESC, created_at LIMIT 1`;
+  if (!me) throw new Error("ยังไม่มีผู้ใช้ในระบบ — เปิดเว็บแล้วสร้างแอดมินคนแรกก่อน");
+  const teacher = async (username: string, fullName: string) => {
+    const [u] = await sql`
+      INSERT INTO users (username, full_name, password_hash, role)
+      VALUES (${username}, ${fullName}, ${hashPassword(PASSWORD)}, 'teacher')
+      ON CONFLICT (username) DO UPDATE SET full_name = EXCLUDED.full_name
+      RETURNING id`;
+    return u.id as string;
+  };
+  const A = me.id as string;
+  const B = await teacher("artemis", "อาร์เทมิส ไนท์เชด");
+  const C = await teacher("orion", "ออริออน เกรย์วูด");
+  const D = await teacher("lyra", "ไลรา มูนบรู๊ค");
+
+  const rooms = (await sql`SELECT id, name FROM rooms WHERE is_active ORDER BY created_at`) as { id: string; name: string }[];
+  for (let i = rooms.length; i < 3; i++) {
+    const [r] = await sql`INSERT INTO rooms (name) VALUES (${`ห้องทดสอบ ${i + 1}`}) RETURNING id, name`;
+    rooms.push(r as { id: string; name: string });
+  }
+  const [R1, R2, R3] = rooms;
+
+  const today = isoToBangkokDate(new Date());
+  const day = isoToBangkokDate(new Date(new Date(`${today}T12:00:00+07:00`).getTime() + 3 * 86400000));
+
+  // [อาจารย์, ห้องในระบบ | ชื่อห้องนอกระบบ, เริ่ม, จบ, วิชา, หัวข้อ, ที่นั่ง, เปิดลงทะเบียน]
+  const rows: [string, { id: string } | string, string, string, string, string, number, boolean][] = [
+    [A, R1, "08:00", "09:30", "วิชาเวทมนต์คาถา", "คาถาจุดไฟขั้นพื้นฐาน", 25, true],
+    [B, R2, "08:00", "10:00", "วิชาสัตว์วิทยา", "มังกรตัวน้อยและการเลี้ยงดู", 18, true],
+    [C, R3, "09:00", "10:30", "วิชาประวัติศาสตร์", "ยุคผู้ก่อตั้งทั้งสี่", 40, false],
+    [A, R2, "10:00", "11:30", "วิชาแปลงกาย", "แปลงหนูเป็นถ้วยชา", 20, true],
+    [B, R1, "10:30", "12:00", "วิชาสมุนไพรและการปรุงยา", "น้ำยาแห่งความจำ", 15, true],
+    [C, R1, "13:00", "14:30", "วิชาอักษรรูน", "การถอดรหัสรูนโบราณ", 22, true],
+    [A, R3, "13:00", "15:00", "วิชาพยากรณ์ศาสตร์", "การอ่านดวงดาว", 30, false],
+    [B, "สนามฝึกบิน (นอกระบบ)", "13:30", "15:30", "วิชาการบินไม้กวาดและม้า", "การบินเป็นหมู่", 12, true],
+    [D, R2, "13:00", "14:00", "วิชาป้องกันตัวจากศาสตร์มืด", "เกราะคุ้มกันพื้นฐาน", 35, true],
+    [C, "โถงใหญ่ (นอกระบบ)", "16:00", "18:00", "วิชาเวทมนต์คาถา", "สอบปฏิบัติปลายภาค", 60, false],
+  ];
+
+  let added = 0;
+  for (const [t, room, s, e, subject, topic, seats, open] of rows) {
+    try {
+      await sql`
+        INSERT INTO schedules (teacher_id, room_id, room_text, start_time, end_time, subject, topic, note,
+                               registration_open, seats)
+        VALUES (${t}, ${typeof room === "string" ? null : room.id}, ${typeof room === "string" ? room : null},
+                ${bangkokToISO(day, s)}, ${bangkokToISO(day, e)}, ${subject}, ${topic},
+                ${`${tag} วันที่มีคาบเยอะ`}, ${open}, ${seats})`;
+      added++;
+      console.log(`  ✓ ${day} ${s}–${e}  ${subject}`);
+    } catch (err) {
+      console.log(`  ✗ ${day} ${s}: ${(err as Error).message}`);
+    }
+  }
+  console.log(`\nเพิ่มคาบวันแน่น ${added} คาบ ในวันที่ ${day}`);
+  console.log(`(ห้องที่ใช้: ${R1.name}, ${R2.name}, ${R3.name} + ห้องนอกระบบ 2 ห้อง)`);
   await pg.close();
 }
 

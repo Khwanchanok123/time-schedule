@@ -110,7 +110,7 @@ export default function UserManager({ users, meId }: { users: UserRow[]; meId: s
               onChange={(e) => set("role", e.target.value as Role)}
               disabled={form.id === meId}
             >
-              <option value="teacher">อาจารย์</option>
+              <option value="teacher">ศาสตราจารย์</option>
               <option value="admin">แอดมิน</option>
             </select>
           </div>

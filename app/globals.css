@@ -46,6 +46,29 @@
 .fc-event-main {
   overflow: hidden;
 }
+
+/* วันนี้: เลขวันที่เป็นวงกลมสีน้ำเงิน (มุมมองเดือน) */
+.fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  margin: 2px;
+  padding: 0 0.35rem;
+  border-radius: 9999px;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 600;
+}
+/* วันนี้: หัวคอลัมน์ในมุมมองสัปดาห์/วัน เป็นแคปซูลสีน้ำเงิน */
+.fc .fc-col-header-cell.fc-day-today .fc-col-header-cell-cushion {
+  margin: 2px 0;
+  border-radius: 9999px;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 600;
+}
 @media (max-width: 640px) {
   .fc .fc-toolbar {
     flex-direction: column;
