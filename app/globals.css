@@ -85,3 +85,8 @@
 .fc .fc-lock-event {
   border: 1px dashed #f87171;
 }
+
+/* วันหยุด (วันพัก / ปิดเทอม): ทั้งช่องวันเป็นลายเหลือง */
+.fc .fc-holiday-day {
+  background: repeating-linear-gradient(-45deg, #fffbeb, #fffbeb 6px, #fef3c7 6px, #fef3c7 12px);
+}

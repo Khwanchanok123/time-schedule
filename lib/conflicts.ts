@@ -1,6 +1,7 @@
 import { toIso, type Sql } from "@/lib/db";
 import { isUuid } from "@/lib/queries";
-import { formatDateTimeRange, formatRange, formatThaiDate } from "@/lib/time";
+import { lockMessage } from "@/lib/locks";
+import { formatRange, formatThaiDate } from "@/lib/time";
 
 export interface ConflictInput {
   teacherId: string;
@@ -84,7 +85,7 @@ export async function findLocks(
   excludeId: string | null = null
 ): Promise<Conflict[]> {
   const rows = await sql`
-    SELECT l.id, l.start_time, l.end_time, l.reason
+    SELECT l.id, l.start_time, l.end_time, l.reason, l.all_day
     FROM schedule_locks l
     WHERE l.start_time < ${endISO}
       AND l.end_time > ${startISO}
@@ -96,9 +97,12 @@ export async function findLocks(
   return rows.map((r) => ({
     kind: "lock" as const,
     scheduleId: r.id,
-    message: `🔒 ช่วงเวลา ${formatDateTimeRange(toIso(r.start_time), toIso(r.end_time))} ถูกล็อกไว้ ไม่สามารถเปิดสอนได้${
-      r.reason ? ` (${r.reason})` : ""
-    }`,
+    message: lockMessage({
+      start_time: toIso(r.start_time),
+      end_time: toIso(r.end_time),
+      reason: r.reason ?? null,
+      all_day: !!r.all_day,
+    }),
   }));
 }
 

@@ -10,7 +10,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
 import { ensureSchema, pgliteSql, type Sql } from "@/lib/db";
 import { dbErrorToThai, findConflicts } from "@/lib/conflicts";
-import { listSchedules } from "@/lib/queries";
+import { listLocks, listSchedules } from "@/lib/queries";
 import { hashPassword, verifyPassword } from "@/lib/auth";
 import { signSession, verifySession } from "@/lib/session";
 import { bangkokToISO } from "@/lib/time";
@@ -386,5 +386,41 @@ describe("ล็อกตาราง (schedule_locks)", () => {
       assert.match(dbErrorToThai(e), /ถูกล็อก/);
       return true;
     });
+  });
+});
+
+describe("วันหยุด (ล็อกทั้งวัน)", () => {
+  before(async () => {
+    // ปิดเทอม 1–3 เม.ย. 2031 = 00:00 ของ 1 เม.ย. ถึง 00:00 ของ 4 เม.ย.
+    await sql`INSERT INTO schedule_locks (start_time, end_time, reason, all_day)
+              VALUES (${bkk("2031-04-01 00:00")}, ${bkk("2031-04-04 00:00")}, 'ปิดเทอม', true)`;
+  });
+
+  test("ทั้งวันเปิดสอนไม่ได้ ตั้งแต่เช้าถึงก่อนเที่ยงคืนของวันสุดท้าย", async () => {
+    await rejects(add(A, R1, "2031-04-01 00:00", "2031-04-01 01:00"), /TIME_LOCKED/);
+    await rejects(add(A, R1, "2031-04-03 23:00", "2031-04-04 00:00"), /TIME_LOCKED/);
+  });
+
+  test("วันก่อนและวันหลังวันหยุด → เปิดสอนได้", async () => {
+    await add(A, R1, "2031-03-31 22:00", "2031-04-01 00:00");
+    await add(A, R1, "2031-04-04 00:00", "2031-04-04 02:00");
+  });
+
+  test("findConflicts แจ้งว่าเป็นวันหยุด พร้อมช่วงวันที่และเหตุผล", async () => {
+    const c = await findConflicts(sql, {
+      teacherId: B,
+      roomId: R2,
+      startISO: bkk("2031-04-02 09:00"),
+      endISO: bkk("2031-04-02 10:00"),
+    });
+    assert.equal(c.length, 1);
+    assert.equal(c[0].kind, "lock");
+    assert.match(c[0].message, /🏖️ .*1 เม\.ย\. 2574 – .*3 เม\.ย\. 2574 เป็นวันหยุด.*ปิดเทอม/);
+  });
+
+  test("listLocks คืน all_day", async () => {
+    const [l] = await listLocks(sql, { from: bkk("2031-04-02 00:00"), to: bkk("2031-04-02 12:00") });
+    assert.equal(l.all_day, true);
+    assert.equal(l.reason, "ปิดเทอม");
   });
 });

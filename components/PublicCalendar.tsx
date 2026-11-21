@@ -10,11 +10,11 @@ import interactionPlugin, { type DateClickArg } from "@fullcalendar/interaction"
 import { useRouter } from "next/navigation";
 import thLocale from "@fullcalendar/core/locales/th";
 import type { EventContentArg, EventInput, EventSourceFuncArg } from "@fullcalendar/core";
+import { lastDayOf, lockMessage } from "@/lib/locks";
 import { PAST_COLOR, colorFor, colorForSubject, textColorFor } from "@/lib/colors";
 import { SUBJECTS } from "@/lib/subjects";
 import {
   TIMEZONE,
-  formatDateTimeRange,
   formatRange,
   formatThaiDate,
   formatTime,
@@ -47,12 +47,14 @@ interface EventProps {
   past: boolean;
 }
 
-/** ช่วงเวลาที่ถูกล็อก (แสดงเป็นพื้นหลังลายในปฏิทิน) */
+/** ช่วงเวลาที่ถูกล็อก / วันหยุด */
 interface LockProps {
   lock: true;
+  /** วันหยุดทั้งวัน (วันพัก / ปิดเทอม) */
+  holiday: boolean;
   reason: string | null;
-  /** วันเวลาเต็ม เช่น "อ. 24 พ.ย. 2569 08:00–17:00" */
-  rangeLabel: string;
+  /** ข้อความเต็ม เช่น "🔒 ช่วงเวลา อ. 24 พ.ย. 2569 08:00–17:00 น. ถูกล็อกไว้ ..." */
+  message: string;
   /** แบบสั้นสำหรับแสดงในช่องปฏิทิน เช่น "08:00–17:00" หรือ "24/11 08:00 – 26/11 17:00" */
   shortLabel: string;
 }
@@ -60,11 +62,11 @@ interface LockProps {
 /** "2026-11-24" → "24/11" */
 const dayMonth = (iso: string) => isoToBangkokDate(iso).slice(5).split("-").reverse().join("/");
 
-/** วันสุดท้ายของช่วงล็อก (จบเที่ยงคืนพอดี = นับเป็นวันก่อนหน้า) */
-const lastLockDay = (endIso: string) => isoToBangkokDate(new Date(new Date(endIso).getTime() - 1));
+/** "2026-11-24" → "2026-11-25" */
+const nextDay = (date: string) => new Date(Date.parse(`${date}T00:00:00Z`) + 24 * 3600 * 1000).toISOString().slice(0, 10);
 
 function shortLockLabel(startIso: string, endIso: string): string {
-  return isoToBangkokDate(startIso) === lastLockDay(endIso)
+  return isoToBangkokDate(startIso) === lastDayOf(endIso)
     ? formatRange(startIso, endIso)
     : `${dayMonth(startIso)} ${formatTime(startIso)} – ${dayMonth(endIso)} ${formatTime(endIso)}`;
 }
@@ -75,6 +77,8 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
   const [notice, setNotice] = useState<string | null>(null);
   // ช่วงที่ล็อกซึ่งโหลดมาล่าสุด (ใช้เช็กตอนคลิกวัน/ช่องเวลา)
   const locksRef = useRef<ScheduleLock[]>([]);
+  // วันที่เป็นวันหยุด ("YYYY-MM-DD") → ระบายสีทั้งช่องวัน
+  const [holidays, setHolidays] = useState<Set<string>>(() => new Set());
 
   // คลิกวัน (มุมมองเดือน) หรือช่องเวลา (มุมมองสัปดาห์/วัน) → ไปหน้าเพิ่มคาบสอน
   // dateStr: "YYYY-MM-DD" หรือ "YYYY-MM-DDTHH:MM:SS+07:00" (เป็นเวลาไทยเพราะตั้ง timeZone ไว้)
@@ -94,19 +98,19 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
       (l) => new Date(l.start_time).getTime() <= from && new Date(l.end_time).getTime() >= to
     );
     if (lock) {
-      setNotice(
-        `🔒 ช่วงเวลา ${formatDateTimeRange(lock.start_time, lock.end_time)} ถูกล็อกไว้ ไม่สามารถเปิดสอนได้${
-          lock.reason ? ` (${lock.reason})` : ""
-        }`
-      );
+      setNotice(lockMessage(lock));
       return;
     }
     setNotice(null);
     router.push(`/dashboard?date=${date}${time ? `&time=${time}` : ""}`);
   };
   // ช่องวันที่ยังไม่ผ่าน: ขึ้นเมาส์เป็นรูปมือ + ไฮไลต์ตอนชี้ (arg.date เป็นวันที่ไทยแบบ UTC-coerced)
-  const dayCellClassNames = (arg: { date: Date }) =>
-    canAdd && arg.date.toISOString().slice(0, 10) >= todayBangkok() ? ["cursor-pointer", "hover:bg-blue-50"] : [];
+  // วันหยุด: พื้นลายเหลืองทั้งช่อง
+  const dayCellClassNames = (arg: { date: Date }) => {
+    const date = arg.date.toISOString().slice(0, 10);
+    if (holidays.has(date)) return ["fc-holiday-day"];
+    return canAdd && date >= todayBangkok() ? ["cursor-pointer", "hover:bg-blue-50"] : [];
+  };
   const [roomFilter, setRoomFilter] = useState("");
   const [teacherFilter, setTeacherFilter] = useState("");
   const [colorBy, setColorBy] = useState<ColorBy>("subject");
@@ -185,13 +189,32 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
       return [];
     }
     locksRef.current = data;
-    return data.map((l) => {
+    const holidayDates = new Set<string>();
+    const events = data.map((l): EventInput => {
       const extendedProps: LockProps = {
         lock: true,
+        holiday: l.all_day,
         reason: l.reason,
-        rangeLabel: formatDateTimeRange(l.start_time, l.end_time),
+        message: lockMessage(l),
         shortLabel: shortLockLabel(l.start_time, l.end_time),
       };
+      if (l.all_day) {
+        // วันหยุด = event ทั้งวัน (แถวบนสุดของวันในมุมมองเดือน / แถว "ทั้งวัน" ในมุมมองสัปดาห์/วัน)
+        const first = isoToBangkokDate(l.start_time);
+        const last = lastDayOf(l.end_time);
+        for (let d = first; d <= last; d = nextDay(d)) holidayDates.add(d);
+        return {
+          id: `lock-${l.id}`,
+          allDay: true,
+          start: first,
+          end: nextDay(last),
+          classNames: ["fc-holiday-event"],
+          backgroundColor: "#fef3c7",
+          borderColor: "#f59e0b",
+          textColor: "#92400e",
+          extendedProps,
+        };
+      }
       return {
         id: `lock-${l.id}`,
         start: l.start_time,
@@ -203,6 +226,8 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
         extendedProps,
       };
     });
+    setHolidays(holidayDates);
+    return events;
   }, []);
 
   const legend: { id: string; label: string; color: string }[] =
@@ -329,9 +354,7 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
             eventClick={(arg) => {
               const lock = arg.event.extendedProps as Partial<LockProps>;
               if (lock.lock) {
-                setNotice(
-                  `🔒 ช่วงเวลา ${lock.rangeLabel} น. ถูกล็อกไว้ ไม่สามารถเปิดสอนได้${lock.reason ? ` (${lock.reason})` : ""}`
-                );
+                setNotice(lock.message ?? null);
               } else {
                 setSelected(arg.event.extendedProps as EventProps);
               }
@@ -340,7 +363,8 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
             slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
             slotMinTime="07:00:00"
             slotMaxTime="22:00:00"
-            allDaySlot={false}
+            // แถว "ทั้งวัน" ใช้แสดงวันหยุดในมุมมองสัปดาห์/วัน
+            allDayText="ทั้งวัน"
             nowIndicator
             dayMaxEvents={4}
             height="auto"
@@ -408,7 +432,15 @@ function Row({ label, value }: { label: string; value: string }) {
 function renderEvent(arg: EventContentArg) {
   if ((arg.event.extendedProps as Partial<LockProps>).lock) {
     const l = arg.event.extendedProps as LockProps;
-    const title = `${l.rangeLabel} น.${l.reason ? ` — ${l.reason}` : ""}`;
+    const title = l.message;
+    if (l.holiday) {
+      // วันหยุด: แถบเหลือง (สีพื้นมาจาก backgroundColor ของ event)
+      return (
+        <div className="w-full cursor-pointer truncate px-1 py-0.5 text-[11px] font-semibold leading-tight" title={title}>
+          🏖️ วันหยุด{l.reason ? <span className="font-normal"> · {l.reason}</span> : null}
+        </div>
+      );
+    }
     if (arg.view.type === "dayGridMonth") {
       return (
         <div

@@ -24,8 +24,8 @@ export default async function AdminLocksPage() {
       <div>
         <h1 className="text-2xl font-semibold">ล็อกตาราง</h1>
         <p className="text-sm text-slate-500">
-          ช่วงเวลาที่ล็อกไว้ จะไม่มีใครเปิดสอนได้ (ทุกห้อง ทุกคน รวมถึงแอดมิน) จนกว่าจะปลดล็อก ·
-          เวลาทั้งหมดเป็นเวลาประเทศไทย
+          ช่วงเวลาหรือวันหยุด (วันพัก / ปิดเทอม) ที่ล็อกไว้ จะไม่มีใครเปิดสอนได้ (ทุกห้อง ทุกคน รวมถึงแอดมิน)
+          จนกว่าจะปลดล็อก · เวลาทั้งหมดเป็นเวลาประเทศไทย
         </p>
       </div>
       <LockManager locks={locks} overlapCounts={overlapCounts} />

@@ -171,6 +171,8 @@ export const SCHEMA: string[] = [
     CONSTRAINT schedule_locks_end_after_start CHECK (end_time > start_time)
   )`,
   `CREATE INDEX IF NOT EXISTS schedule_locks_start_idx ON schedule_locks (start_time)`,
+  // วันหยุด (วันพัก / ปิดเทอม) = ล็อกทั้งวัน ตั้งแต่ 00:00 ของวันแรก ถึง 00:00 ของวันถัดจากวันสุดท้าย
+  `ALTER TABLE schedule_locks ADD COLUMN IF NOT EXISTS all_day BOOLEAN NOT NULL DEFAULT false`,
 
   // กันอีกชั้นที่ระดับฐานข้อมูล: ห้ามเพิ่มคาบ หรือย้ายเวลาคาบ ให้ทับช่วงที่ถูกล็อก
   // (คาบเดิมที่มีอยู่ก่อนล็อก แก้รายละเอียดอื่นได้ตราบใดที่ไม่เปลี่ยนเวลา)
@@ -197,7 +199,7 @@ export async function ensureSchema(sql: Sql): Promise<void> {
 }
 
 // เพิ่มเลขนี้เมื่อแก้โครงสร้างฐานข้อมูล เพื่อให้ ensureSchema รันใหม่โดยไม่ต้องรีสตาร์ทเซิร์ฟเวอร์ตอน dev
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 /**
  * เช็กเลขเวอร์ชันโครงสร้างที่เก็บไว้ในฐานข้อมูลก่อน (1 query) — ตรงแล้วไม่ต้องรัน SCHEMA ทั้ง 18 คำสั่ง

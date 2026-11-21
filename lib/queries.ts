@@ -74,7 +74,7 @@ export async function listTeachers(sql: Sql): Promise<{ id: string; full_name: s
 /** ช่วงเวลาที่ถูกล็อก ที่ทับช่วง [from, to) (ไม่ระบุ = ทั้งหมด) */
 export async function listLocks(sql: Sql, f: { from?: string; to?: string } = {}): Promise<ScheduleLock[]> {
   const rows = await sql`
-    SELECT l.id, l.start_time, l.end_time, l.reason, u.full_name AS created_by_name
+    SELECT l.id, l.start_time, l.end_time, l.reason, l.all_day, u.full_name AS created_by_name
     FROM schedule_locks l
     LEFT JOIN users u ON u.id = l.created_by
     WHERE (${f.to ?? null}::timestamptz IS NULL OR l.start_time < ${f.to ?? null}::timestamptz)
@@ -85,6 +85,7 @@ export async function listLocks(sql: Sql, f: { from?: string; to?: string } = {}
     start_time: toIso(r.start_time),
     end_time: toIso(r.end_time),
     reason: r.reason ?? null,
+    all_day: !!r.all_day,
     created_by_name: r.created_by_name ?? null,
   }));
 }

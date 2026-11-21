@@ -41,6 +41,8 @@ export interface ScheduleLock {
   start_time: string; // ISO (UTC)
   end_time: string;
   reason: string | null;
+  /** วันหยุดทั้งวัน (วันพัก / ปิดเทอม) */
+  all_day: boolean;
   created_by_name: string | null;
 }
 
