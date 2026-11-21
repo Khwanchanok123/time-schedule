@@ -35,6 +35,15 @@ export interface ScheduleWithRelations extends Schedule {
   room: { id: string | null; name: string; building: string | null; custom: boolean } | null;
 }
 
+/** ช่วงเวลาที่ถูกล็อก (ห้ามเปิดสอนทุกห้อง) */
+export interface ScheduleLock {
+  id: string;
+  start_time: string; // ISO (UTC)
+  end_time: string;
+  reason: string | null;
+  created_by_name: string | null;
+}
+
 export type ActionResult =
   | { ok: true; message?: string }
   | { ok: false; error: string };

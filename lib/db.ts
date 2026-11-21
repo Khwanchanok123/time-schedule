@@ -159,6 +159,37 @@ export const SCHEMA: string[] = [
   `DROP TRIGGER IF EXISTS rooms_prevent_delete ON rooms`,
   `CREATE TRIGGER rooms_prevent_delete BEFORE DELETE ON rooms
    FOR EACH ROW EXECUTE FUNCTION prevent_room_delete_with_future()`,
+
+  // ล็อกตาราง: ช่วงเวลาที่ห้ามเปิดสอน (ทุกห้อง ทุกคน รวมแอดมิน) — แอดมินเป็นคนสร้าง/ลบ
+  `CREATE TABLE IF NOT EXISTS schedule_locks (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    start_time TIMESTAMPTZ NOT NULL,
+    end_time   TIMESTAMPTZ NOT NULL,
+    reason     TEXT,
+    created_by UUID REFERENCES users (id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT schedule_locks_end_after_start CHECK (end_time > start_time)
+  )`,
+  `CREATE INDEX IF NOT EXISTS schedule_locks_start_idx ON schedule_locks (start_time)`,
+
+  // กันอีกชั้นที่ระดับฐานข้อมูล: ห้ามเพิ่มคาบ หรือย้ายเวลาคาบ ให้ทับช่วงที่ถูกล็อก
+  // (คาบเดิมที่มีอยู่ก่อนล็อก แก้รายละเอียดอื่นได้ตราบใดที่ไม่เปลี่ยนเวลา)
+  `CREATE OR REPLACE FUNCTION prevent_schedule_in_lock() RETURNS trigger
+   LANGUAGE plpgsql AS $$
+   BEGIN
+     IF TG_OP = 'UPDATE' AND NEW.start_time = OLD.start_time AND NEW.end_time = OLD.end_time THEN
+       RETURN NEW;
+     END IF;
+     IF EXISTS (SELECT 1 FROM schedule_locks
+                WHERE start_time < NEW.end_time AND end_time > NEW.start_time) THEN
+       RAISE EXCEPTION 'TIME_LOCKED';
+     END IF;
+     RETURN NEW;
+   END;
+   $$`,
+  `DROP TRIGGER IF EXISTS schedules_prevent_locked ON schedules`,
+  `CREATE TRIGGER schedules_prevent_locked BEFORE INSERT OR UPDATE ON schedules
+   FOR EACH ROW EXECUTE FUNCTION prevent_schedule_in_lock()`,
 ];
 
 export async function ensureSchema(sql: Sql): Promise<void> {
@@ -166,7 +197,7 @@ export async function ensureSchema(sql: Sql): Promise<void> {
 }
 
 // เพิ่มเลขนี้เมื่อแก้โครงสร้างฐานข้อมูล เพื่อให้ ensureSchema รันใหม่โดยไม่ต้องรีสตาร์ทเซิร์ฟเวอร์ตอน dev
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 /**
  * เช็กเลขเวอร์ชันโครงสร้างที่เก็บไว้ในฐานข้อมูลก่อน (1 query) — ตรงแล้วไม่ต้องรัน SCHEMA ทั้ง 18 คำสั่ง

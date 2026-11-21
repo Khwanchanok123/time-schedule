@@ -334,3 +334,57 @@ describe("ผู้ใช้และการล็อกอิน", () => {
     assert.equal(await verifySession(`${body}.x${sig}`), null);
   });
 });
+
+describe("ล็อกตาราง (schedule_locks)", () => {
+  let existing: string;
+  before(async () => {
+    // คาบที่มีอยู่ก่อนล็อก
+    existing = await add(A, R1, "2031-03-10 09:00", "2031-03-10 10:00");
+    await sql`INSERT INTO schedule_locks (start_time, end_time, reason)
+              VALUES (${bkk("2031-03-10 08:00")}, ${bkk("2031-03-10 17:00")}, 'สอบกลางภาค')`;
+  });
+
+  test("เพิ่มคาบในช่วงที่ล็อก → DB ปฏิเสธ (ทุกห้อง ทุกคน)", async () => {
+    await rejects(add(B, R2, "2031-03-10 13:00", "2031-03-10 14:00"), /TIME_LOCKED/);
+    await rejects(add(B, null, "2031-03-10 16:30", "2031-03-10 18:00"), /TIME_LOCKED/);
+  });
+
+  test("ต่อกันพอดีกับขอบล็อก → ได้", async () => {
+    await add(B, R2, "2031-03-10 17:00", "2031-03-10 18:00");
+    await add(B, R2, "2031-03-10 07:00", "2031-03-10 08:00");
+  });
+
+  test("คาบเดิมแก้รายละเอียดได้ แต่ย้ายเวลาในช่วงล็อกไม่ได้", async () => {
+    await sql`UPDATE schedules SET topic = 'ใหม่', start_time = start_time WHERE id = ${existing}`;
+    await rejects(
+      sql`UPDATE schedules SET end_time = ${bkk("2031-03-10 11:00")} WHERE id = ${existing}`,
+      /TIME_LOCKED/
+    );
+  });
+
+  test("findConflicts แจ้งแบบ lock พร้อมเหตุผล", async () => {
+    const c = await findConflicts(sql, {
+      teacherId: B,
+      roomId: R2,
+      startISO: bkk("2031-03-10 12:00"),
+      endISO: bkk("2031-03-10 13:00"),
+    });
+    assert.equal(c.length, 1);
+    assert.equal(c[0].kind, "lock");
+    assert.match(c[0].message, /ถูกล็อก.*สอบกลางภาค/);
+  });
+
+  test("findConflicts: แก้คาบเดิมโดยไม่เปลี่ยนเวลา → ไม่นับล็อก", async () => {
+    const input = { teacherId: A, roomId: R1, startISO: bkk("2031-03-10 09:00"), endISO: bkk("2031-03-10 10:00") };
+    assert.equal((await findConflicts(sql, { ...input, excludeId: existing })).length, 0);
+    const moved = await findConflicts(sql, { ...input, endISO: bkk("2031-03-10 10:30"), excludeId: existing });
+    assert.deepEqual(moved.map((x) => x.kind), ["lock"]);
+  });
+
+  test("แปลง error เป็นข้อความภาษาไทย", async () => {
+    await assert.rejects(add(B, R2, "2031-03-10 10:00", "2031-03-10 11:00"), (e) => {
+      assert.match(dbErrorToThai(e), /ถูกล็อก/);
+      return true;
+    });
+  });
+});

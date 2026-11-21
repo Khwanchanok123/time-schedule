@@ -1,5 +1,5 @@
 import { toIso, type Row, type Sql } from "@/lib/db";
-import type { Room, ScheduleWithRelations } from "@/lib/types";
+import type { Room, ScheduleLock, ScheduleWithRelations } from "@/lib/types";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (v: unknown): v is string => typeof v === "string" && UUID_RE.test(v);
@@ -69,4 +69,22 @@ export async function listTeachers(sql: Sql): Promise<{ id: string; full_name: s
   return sql`SELECT id, full_name FROM users ORDER BY full_name` as Promise<
     { id: string; full_name: string }[]
   >;
+}
+
+/** ช่วงเวลาที่ถูกล็อก ที่ทับช่วง [from, to) (ไม่ระบุ = ทั้งหมด) */
+export async function listLocks(sql: Sql, f: { from?: string; to?: string } = {}): Promise<ScheduleLock[]> {
+  const rows = await sql`
+    SELECT l.id, l.start_time, l.end_time, l.reason, u.full_name AS created_by_name
+    FROM schedule_locks l
+    LEFT JOIN users u ON u.id = l.created_by
+    WHERE (${f.to ?? null}::timestamptz IS NULL OR l.start_time < ${f.to ?? null}::timestamptz)
+      AND (${f.from ?? null}::timestamptz IS NULL OR l.end_time > ${f.from ?? null}::timestamptz)
+    ORDER BY l.start_time`;
+  return rows.map((r) => ({
+    id: r.id,
+    start_time: toIso(r.start_time),
+    end_time: toIso(r.end_time),
+    reason: r.reason ?? null,
+    created_by_name: r.created_by_name ?? null,
+  }));
 }

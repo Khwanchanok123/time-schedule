@@ -35,6 +35,9 @@ export default async function Navbar() {
               <Link href="/admin/users" className="hover:text-blue-600">
                 จัดการผู้ใช้
               </Link>
+              <Link href="/admin/locks" className="hover:text-blue-600">
+                ล็อกตาราง
+              </Link>
             </>
           )}
         </div>

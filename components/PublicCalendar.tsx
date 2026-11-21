@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -10,10 +10,10 @@ import interactionPlugin, { type DateClickArg } from "@fullcalendar/interaction"
 import { useRouter } from "next/navigation";
 import thLocale from "@fullcalendar/core/locales/th";
 import type { EventContentArg, EventInput, EventSourceFuncArg } from "@fullcalendar/core";
-import { colorFor, colorForSubject } from "@/lib/colors";
+import { PAST_COLOR, colorFor, colorForSubject, textColorFor } from "@/lib/colors";
 import { SUBJECTS } from "@/lib/subjects";
-import { TIMEZONE, formatRange, formatThaiDate, formatTime, todayBangkok } from "@/lib/time";
-import type { Room, ScheduleWithRelations } from "@/lib/types";
+import { TIMEZONE, formatDateTimeRange, formatRange, formatThaiDate, formatTime, todayBangkok } from "@/lib/time";
+import type { Room, ScheduleLock, ScheduleWithRelations } from "@/lib/types";
 
 interface Props {
   rooms: Room[];
@@ -35,12 +35,23 @@ interface EventProps {
   seats: number | null;
   timeLabel: string;
   dateLabel: string;
+  /** สอนจบไปแล้ว (แสดงเป็นสีเทา) */
+  past: boolean;
+}
+
+/** ช่วงเวลาที่ถูกล็อก (แสดงเป็นพื้นหลังลายในปฏิทิน) */
+interface LockProps {
+  lock: true;
+  reason: string | null;
+  rangeLabel: string;
 }
 
 export default function PublicCalendar({ rooms, teachers, canAdd = false }: Props) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // ช่วงที่ล็อกซึ่งโหลดมาล่าสุด (ใช้เช็กตอนคลิกวัน/ช่องเวลา)
+  const locksRef = useRef<ScheduleLock[]>([]);
 
   // คลิกวัน (มุมมองเดือน) หรือช่องเวลา (มุมมองสัปดาห์/วัน) → ไปหน้าเพิ่มคาบสอน
   // dateStr: "YYYY-MM-DD" หรือ "YYYY-MM-DDTHH:MM:SS+07:00" (เป็นเวลาไทยเพราะตั้ง timeZone ไว้)
@@ -51,6 +62,20 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
     const today = todayBangkok();
     if (date < today || (date === today && time && time < formatTime(new Date()))) {
       setNotice("เลือกวันเวลาที่ผ่านมาแล้วไม่ได้ — คลิกวันนี้หรือวันข้างหน้า");
+      return;
+    }
+    // คลิกช่องเวลาที่อยู่ในช่วงล็อก หรือคลิกวันที่ถูกล็อกทั้งวัน → ไม่ให้ไปเพิ่มคาบ
+    const from = new Date(`${date}T${time ?? "00:00"}:00+07:00`).getTime();
+    const to = time ? from + 1 : from + 24 * 3600 * 1000;
+    const lock = locksRef.current.find(
+      (l) => new Date(l.start_time).getTime() <= from && new Date(l.end_time).getTime() >= to
+    );
+    if (lock) {
+      setNotice(
+        `🔒 ช่วงเวลา ${formatDateTimeRange(lock.start_time, lock.end_time)} ถูกล็อกไว้ ไม่สามารถเปิดสอนได้${
+          lock.reason ? ` (${lock.reason})` : ""
+        }`
+      );
       return;
     }
     setNotice(null);
@@ -88,9 +113,13 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
       }
       setLoadError(null);
 
+      const now = Date.now();
       return data.map((s) => {
-        const color =
-          colorBy === "subject"
+        const past = new Date(s.end_time).getTime() <= now;
+        // คาบที่สอนจบแล้วเป็นสีเทา
+        const color = past
+          ? PAST_COLOR
+          : colorBy === "subject"
             ? colorForSubject(s.subject)
             : colorFor(colorBy === "room" ? (s.room_id ?? s.room_text?.toLowerCase()) : s.teacher_id);
         const extendedProps: EventProps = {
@@ -104,6 +133,7 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
           seats: s.seats,
           timeLabel: formatRange(s.start_time, s.end_time),
           dateLabel: formatThaiDate(s.start_time),
+          past,
         };
         return {
           id: s.id,
@@ -112,13 +142,42 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
           end: s.end_time,
           backgroundColor: color,
           borderColor: color,
-          textColor: "#ffffff",
+          textColor: textColorFor(color),
           extendedProps,
         };
       });
     },
     [roomFilter, teacherFilter, colorBy]
   );
+
+  // ช่วงเวลาที่ถูกล็อก → พื้นหลังลายแดงในปฏิทิน (ไม่ขึ้นกับตัวกรอง เพราะล็อกทุกห้อง)
+  const fetchLocks = useCallback(async (info: EventSourceFuncArg): Promise<EventInput[]> => {
+    const params = new URLSearchParams({ start: info.start.toISOString(), end: info.end.toISOString() });
+    let data: ScheduleLock[];
+    try {
+      const res = await fetch(`/api/locks?${params}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(res.statusText);
+      data = await res.json();
+    } catch {
+      return [];
+    }
+    locksRef.current = data;
+    return data.map((l) => {
+      const extendedProps: LockProps = {
+        lock: true,
+        reason: l.reason,
+        rangeLabel: formatDateTimeRange(l.start_time, l.end_time),
+      };
+      return {
+        id: `lock-${l.id}`,
+        start: l.start_time,
+        end: l.end_time,
+        display: "background",
+        classNames: ["fc-lock-event"],
+        extendedProps,
+      };
+    });
+  }, []);
 
   const legend: { id: string; label: string; color: string }[] =
     colorBy === "subject"
@@ -198,6 +257,14 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
               {l.label}
             </span>
           ))}
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: PAST_COLOR }} />
+            สอนจบแล้ว
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="fc-lock-swatch h-3 w-3 rounded-sm" />
+            ล็อก (เปิดสอนไม่ได้)
+          </span>
         </div>
       )}
 
@@ -231,9 +298,11 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
               right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
             }}
             buttonText={{ today: "วันนี้", month: "เดือน", week: "สัปดาห์", day: "วัน", list: "รายการ" }}
-            events={fetchEvents}
+            eventSources={[fetchEvents, fetchLocks]}
             eventContent={renderEvent}
-            eventClick={(arg) => setSelected(arg.event.extendedProps as EventProps)}
+            eventClick={(arg) => {
+              if (arg.event.display !== "background") setSelected(arg.event.extendedProps as EventProps);
+            }}
             eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
             slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
             slotMinTime="07:00:00"
@@ -304,6 +373,14 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function renderEvent(arg: EventContentArg) {
+  if (arg.event.display === "background") {
+    const l = arg.event.extendedProps as LockProps;
+    return (
+      <div className="p-0.5 text-[11px] font-semibold leading-tight text-red-800" title={l.rangeLabel}>
+        🔒 ล็อก{l.reason ? `: ${l.reason}` : ""}
+      </div>
+    );
+  }
   const p = arg.event.extendedProps as EventProps;
   const view = arg.view.type;
 
@@ -314,7 +391,7 @@ function renderEvent(arg: EventContentArg) {
     p.subject,
     p.topic && `หัวข้อ: ${p.topic}`,
     p.seats != null && `${p.seats} ที่นั่ง`,
-    p.registrationOpen ? "เปิดให้ลงทะเบียนแล้ว" : "ยังไม่เปิดลงทะเบียน",
+    p.past ? "สอนจบแล้ว" : p.registrationOpen ? "เปิดให้ลงทะเบียนแล้ว" : "ยังไม่เปิดลงทะเบียน",
   ]
     .filter(Boolean)
     .join(" | ");
@@ -322,8 +399,8 @@ function renderEvent(arg: EventContentArg) {
   if (view === "dayGridMonth") {
     return (
       <div
-        className="w-full cursor-pointer overflow-hidden rounded px-1 py-0.5 text-[11px] leading-tight text-white"
-        style={{ backgroundColor: arg.event.backgroundColor }}
+        className="w-full cursor-pointer overflow-hidden rounded px-1 py-0.5 text-[11px] leading-tight"
+        style={{ backgroundColor: arg.event.backgroundColor, color: arg.event.textColor }}
         title={tooltip}
       >
         <div className="truncate">
@@ -338,7 +415,7 @@ function renderEvent(arg: EventContentArg) {
   if (view.startsWith("list")) {
     return (
       <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
-        <span>
+        <span className={p.past ? "text-slate-400" : ""}>
           <b>ศจ.{p.teacherName}</b> — ห้อง {p.roomName}
           {p.subject ? ` — ${p.subject}` : ""}
           {p.topic ? ` (${p.topic})` : ""}

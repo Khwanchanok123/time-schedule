@@ -67,6 +67,18 @@ export function formatRange(startIso: string, endIso: string): string {
   return `${formatTime(startIso)}–${formatTime(endIso)}`;
 }
 
+/** ช่วงวันเวลา: วันเดียวกัน → "อ. 10 พ.ย. 2569 09:00–12:00" / ข้ามวัน → "อ. 10 พ.ย. 2569 09:00 – พ. 11 พ.ย. 2569 12:00" */
+export function formatDateTimeRange(startIso: string, endIso: string): string {
+  const sameDay =
+    isoToBangkokDate(startIso) === isoToBangkokDate(endIso) ||
+    // จบเที่ยงคืนพอดี ถือเป็นวันเดียวกัน (เช่น 00:00–24:00)
+    (formatTime(endIso) === "00:00" &&
+      isoToBangkokDate(new Date(new Date(endIso).getTime() - 1)) === isoToBangkokDate(startIso));
+  return sameDay
+    ? `${formatThaiDate(startIso)} ${formatRange(startIso, endIso)}`
+    : `${formatThaiDate(startIso)} ${formatTime(startIso)} – ${formatThaiDate(endIso)} ${formatTime(endIso)}`;
+}
+
 /** วันนี้ (เวลาไทย) เป็น "YYYY-MM-DD" */
 export function todayBangkok(): string {
   return isoToBangkokDate(new Date());

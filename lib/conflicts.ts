@@ -1,6 +1,6 @@
 import { toIso, type Sql } from "@/lib/db";
 import { isUuid } from "@/lib/queries";
-import { formatRange, formatThaiDate } from "@/lib/time";
+import { formatDateTimeRange, formatRange, formatThaiDate } from "@/lib/time";
 
 export interface ConflictInput {
   teacherId: string;
@@ -15,7 +15,8 @@ export interface ConflictInput {
 }
 
 export interface Conflict {
-  kind: "room" | "teacher";
+  kind: "room" | "teacher" | "lock";
+  /** id ของคาบที่ชน (หรือ id ของการล็อก เมื่อ kind = "lock") */
   scheduleId: string;
   message: string;
 }
@@ -25,6 +26,7 @@ export interface Conflict {
  * เงื่อนไขทับซ้อน: start ใหม่ < end เดิม AND end ใหม่ > start เดิม
  * - ห้องเดียวกัน หรือ
  * - ศาสตราจารย์คนเดียวกัน (แม้ต่างห้อง)
+ * - ช่วงเวลาที่ถูกล็อก (ทุกห้อง ทุกคน) — ตอนแก้ไขคาบเดิมโดยไม่เปลี่ยนเวลา จะไม่นับ (ตรงกับ trigger ใน DB)
  */
 export async function findConflicts(sql: Sql, input: ConflictInput): Promise<Conflict[]> {
   const { teacherId, startISO, endISO } = input;
@@ -48,7 +50,9 @@ export async function findConflicts(sql: Sql, input: ConflictInput): Promise<Con
       AND (${excludeId}::uuid IS NULL OR s.id <> ${excludeId}::uuid)
     ORDER BY s.start_time`;
 
-  return rows.map((r) => {
+  const locks = await findLocks(sql, startISO, endISO, excludeId);
+
+  return locks.concat(rows.map((r) => {
     const teacherName = r.teacher_name || "ไม่ทราบชื่อ";
     const roomName = r.room_name || r.room_text || "-";
     const start = toIso(r.start_time);
@@ -69,7 +73,33 @@ export async function findConflicts(sql: Sql, input: ConflictInput): Promise<Con
       scheduleId: r.id,
       message: `ศจ.${teacherName} มีสอนอยู่แล้วที่ห้อง ${roomName} เวลา ${time} (${date})`,
     };
-  });
+  }));
+}
+
+/** ช่วงที่ถูกล็อกซึ่งทับ [startISO, endISO) — excludeId: คาบที่แก้ไขโดยเวลาไม่เปลี่ยน ไม่นับ */
+export async function findLocks(
+  sql: Sql,
+  startISO: string,
+  endISO: string,
+  excludeId: string | null = null
+): Promise<Conflict[]> {
+  const rows = await sql`
+    SELECT l.id, l.start_time, l.end_time, l.reason
+    FROM schedule_locks l
+    WHERE l.start_time < ${endISO}
+      AND l.end_time > ${startISO}
+      AND NOT EXISTS (SELECT 1 FROM schedules s
+                      WHERE s.id = ${excludeId}::uuid
+                        AND s.start_time = ${startISO}::timestamptz
+                        AND s.end_time = ${endISO}::timestamptz)
+    ORDER BY l.start_time`;
+  return rows.map((r) => ({
+    kind: "lock" as const,
+    scheduleId: r.id,
+    message: `🔒 ช่วงเวลา ${formatDateTimeRange(toIso(r.start_time), toIso(r.end_time))} ถูกล็อกไว้ ไม่สามารถเปิดสอนได้${
+      r.reason ? ` (${r.reason})` : ""
+    }`,
+  }));
 }
 
 /** แปลง error จากฐานข้อมูลเป็นข้อความภาษาไทย (ใช้ได้ทั้ง Neon และ PGlite) */
@@ -88,6 +118,7 @@ export function dbErrorToThai(e: unknown): string {
     if (text.includes("rooms_name")) return "ชื่อห้องนี้มีอยู่แล้ว";
     return "ข้อมูลซ้ำกับที่มีอยู่แล้ว";
   }
+  if (text.includes("TIME_LOCKED")) return "🔒 ช่วงเวลานี้ถูกล็อกไว้ ไม่สามารถเปิดสอนได้";
   if (text.includes("ROOM_HAS_FUTURE_SCHEDULES")) return "ห้องนี้มีตารางสอนในอนาคต ไม่สามารถลบได้";
   console.error(e);
   return "เกิดข้อผิดพลาดในการบันทึกข้อมูล";

@@ -75,3 +75,13 @@
     gap: 0.5rem;
   }
 }
+
+/* ช่วงเวลาที่ถูกล็อก: พื้นหลังลายเส้นสีแดง (เปิดสอนไม่ได้) */
+.fc .fc-lock-event,
+.fc-lock-swatch {
+  background: repeating-linear-gradient(-45deg, #fee2e2, #fee2e2 6px, #fecaca 6px, #fecaca 12px);
+  opacity: 0.85;
+}
+.fc .fc-lock-event {
+  border: 1px dashed #f87171;
+}

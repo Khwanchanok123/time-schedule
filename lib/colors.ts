@@ -14,7 +14,7 @@ const SUBJECT_COLORS = [
   "#16a34a", // สัตว์วิทยา
   "#b45309", // ประวัติศาสตร์
   "#0d9488", // สมุนไพรและการปรุงยา
-  "#db2777", // แปลงกาย
+  "#eab308", // แปลงกาย (เหลือง — ใช้ตัวอักษรสีเข้ม ดู textColorFor)
   "#ea580c", // เวทมนต์คาถา
   "#dc2626", // ป้องกันตัวจากศาสตร์มืด
   "#4f46e5", // อักษรรูน
@@ -32,4 +32,14 @@ export function colorFor(id: string | null | undefined): string {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
   return PALETTE[h % PALETTE.length];
+}
+
+/** สีของคาบที่สอนจบไปแล้ว (แสดงเป็นสีเทาในปฏิทิน) */
+export const PAST_COLOR = "#9ca3af";
+
+/** สีตัวอักษรที่อ่านชัดบนพื้นสีนั้น (พื้นสีอ่อนอย่างเหลือง → ตัวอักษรเข้ม) */
+export function textColorFor(bg: string): string {
+  const n = parseInt(bg.slice(1), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  return 0.299 * r + 0.587 * g + 0.114 * b > 170 ? "#1f2937" : "#ffffff";
 }

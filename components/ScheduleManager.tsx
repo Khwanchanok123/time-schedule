@@ -534,7 +534,9 @@ export default function ScheduleManager({
             {checking && <p className="text-sm text-slate-500">กำลังตรวจสอบเวลาว่าง...</p>}
             {!checking && conflicts.length > 0 && (
               <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                <p className="mb-1 font-medium">⚠️ เวลาทับซ้อน</p>
+                <p className="mb-1 font-medium">
+                  {conflicts.some((c) => c.kind === "lock") ? "⚠️ เวลานี้เปิดสอนไม่ได้" : "⚠️ เวลาทับซ้อน"}
+                </p>
                 <ul className="list-disc space-y-0.5 pl-5">
                   {conflicts.map((c) => (
                     <li key={c.scheduleId + c.kind}>{c.message}</li>
