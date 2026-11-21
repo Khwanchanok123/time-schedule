@@ -63,9 +63,6 @@ const dayMonth = (iso: string) => isoToBangkokDate(iso).slice(5).split("-").reve
 /** วันสุดท้ายของช่วงล็อก (จบเที่ยงคืนพอดี = นับเป็นวันก่อนหน้า) */
 const lastLockDay = (endIso: string) => isoToBangkokDate(new Date(new Date(endIso).getTime() - 1));
 
-/** "2026-11-24" → "2026-11-25" */
-const nextDay = (date: string) => new Date(Date.parse(`${date}T00:00:00Z`) + 24 * 3600 * 1000).toISOString().slice(0, 10);
-
 function shortLockLabel(startIso: string, endIso: string): string {
   return isoToBangkokDate(startIso) === lastLockDay(endIso)
     ? formatRange(startIso, endIso)
@@ -78,8 +75,6 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
   const [notice, setNotice] = useState<string | null>(null);
   // ช่วงที่ล็อกซึ่งโหลดมาล่าสุด (ใช้เช็กตอนคลิกวัน/ช่องเวลา)
   const locksRef = useRef<ScheduleLock[]>([]);
-  // ช่วงที่ล็อกในช่วงวันที่ที่กำลังแสดง (แสดงเป็นรายการเหนือปฏิทิน)
-  const [visibleLocks, setVisibleLocks] = useState<ScheduleLock[]>([]);
 
   // คลิกวัน (มุมมองเดือน) หรือช่องเวลา (มุมมองสัปดาห์/วัน) → ไปหน้าเพิ่มคาบสอน
   // dateStr: "YYYY-MM-DD" หรือ "YYYY-MM-DDTHH:MM:SS+07:00" (เป็นเวลาไทยเพราะตั้ง timeZone ไว้)
@@ -178,7 +173,7 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
     [roomFilter, teacherFilter, colorBy]
   );
 
-  // ช่วงเวลาที่ถูกล็อก → พื้นหลังลายแดงในปฏิทิน (ไม่ขึ้นกับตัวกรอง เพราะล็อกทุกห้อง)
+  // ช่วงเวลาที่ถูกล็อก → แถบลายแดง เรียงตามเวลาร่วมกับคาบสอน (ไม่ขึ้นกับตัวกรอง เพราะล็อกทุกห้อง)
   const fetchLocks = useCallback(async (info: EventSourceFuncArg): Promise<EventInput[]> => {
     const params = new URLSearchParams({ start: info.start.toISOString(), end: info.end.toISOString() });
     let data: ScheduleLock[];
@@ -190,37 +185,23 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
       return [];
     }
     locksRef.current = data;
-    setVisibleLocks(data);
-    return data.flatMap((l) => {
+    return data.map((l) => {
       const extendedProps: LockProps = {
         lock: true,
         reason: l.reason,
         rangeLabel: formatDateTimeRange(l.start_time, l.end_time),
         shortLabel: shortLockLabel(l.start_time, l.end_time),
       };
-      return [
-        // มุมมองสัปดาห์/วัน: พื้นหลังลายแดงตรงช่วงเวลาที่ล็อก
-        {
-          id: `lock-${l.id}`,
-          start: l.start_time,
-          end: l.end_time,
-          display: "background",
-          classNames: ["fc-lock-event"],
-          extendedProps,
-        },
-        // มุมมองเดือน/รายการ: แถบ "🔒 ล็อก" แบบทั้งวัน (มุมมองเดือนไม่แสดงพื้นหลังที่มีเวลา
-        // ส่วนมุมมองสัปดาห์/วันปิดแถวทั้งวันไว้ จึงไม่ซ้ำกัน)
-        {
-          id: `lock-day-${l.id}`,
-          allDay: true,
-          start: isoToBangkokDate(l.start_time),
-          end: nextDay(lastLockDay(l.end_time)),
-          backgroundColor: "#fee2e2",
-          borderColor: "#f87171",
-          textColor: "#991b1b",
-          extendedProps,
-        },
-      ];
+      return {
+        id: `lock-${l.id}`,
+        start: l.start_time,
+        end: l.end_time,
+        classNames: ["fc-lock-event"],
+        backgroundColor: "#fee2e2",
+        borderColor: "#f87171",
+        textColor: "#991b1b",
+        extendedProps,
+      };
     });
   }, []);
 
@@ -319,19 +300,6 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
         </p>
       )}
       {notice && <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{notice}</p>}
-
-      {visibleLocks.length > 0 && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          <p className="font-semibold">🔒 ช่วงเวลาที่ล็อก (เปิดสอนไม่ได้)</p>
-          <ul className="mt-1 list-disc space-y-0.5 pl-5">
-            {visibleLocks.map((l) => (
-              <li key={l.id}>
-                {formatDateTimeRange(l.start_time, l.end_time)} น.{l.reason ? ` — ${l.reason}` : ""}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
 
       {loadError && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -438,22 +406,30 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function renderEvent(arg: EventContentArg) {
-  if ((arg.event.extendedProps as Partial<LockProps>).lock && arg.event.allDay) {
+  if ((arg.event.extendedProps as Partial<LockProps>).lock) {
     const l = arg.event.extendedProps as LockProps;
+    const title = `${l.rangeLabel} น.${l.reason ? ` — ${l.reason}` : ""}`;
+    if (arg.view.type === "dayGridMonth") {
+      return (
+        <div
+          className="fc-lock-swatch w-full cursor-pointer truncate rounded border border-dashed border-red-400 px-1 py-0.5 text-[11px] font-semibold leading-tight text-red-800"
+          title={title}
+        >
+          🔒 ล็อก {l.shortLabel}
+          {l.reason ? <span className="font-normal"> · {l.reason}</span> : null}
+        </div>
+      );
+    }
+    if (arg.view.type.startsWith("list")) {
+      return (
+        <span className="font-semibold text-red-800">
+          🔒 ล็อก — เปิดสอนไม่ได้{l.reason ? <span className="font-normal"> ({l.reason})</span> : null}
+        </span>
+      );
+    }
+    // timeGridWeek / timeGridDay
     return (
-      <div
-        className="w-full cursor-pointer truncate px-1 py-0.5 text-[11px] font-semibold leading-tight"
-        title={`${l.rangeLabel} น.${l.reason ? ` — ${l.reason}` : ""}`}
-      >
-        🔒 ล็อก {l.shortLabel}
-        {l.reason ? <span className="font-normal"> · {l.reason}</span> : null}
-      </div>
-    );
-  }
-  if (arg.event.display === "background") {
-    const l = arg.event.extendedProps as LockProps;
-    return (
-      <div className="p-0.5 text-[11px] font-semibold leading-tight text-red-800" title={`${l.rangeLabel} น.`}>
+      <div className="cursor-pointer p-0.5 text-[11px] font-semibold leading-snug text-red-800" title={title}>
         <div>🔒 ล็อก {l.shortLabel}</div>
         {l.reason && <div className="font-normal">{l.reason}</div>}
       </div>
