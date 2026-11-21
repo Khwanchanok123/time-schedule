@@ -12,7 +12,15 @@ import thLocale from "@fullcalendar/core/locales/th";
 import type { EventContentArg, EventInput, EventSourceFuncArg } from "@fullcalendar/core";
 import { PAST_COLOR, colorFor, colorForSubject, textColorFor } from "@/lib/colors";
 import { SUBJECTS } from "@/lib/subjects";
-import { TIMEZONE, formatDateTimeRange, formatRange, formatThaiDate, formatTime, todayBangkok } from "@/lib/time";
+import {
+  TIMEZONE,
+  formatDateTimeRange,
+  formatRange,
+  formatThaiDate,
+  formatTime,
+  isoToBangkokDate,
+  todayBangkok,
+} from "@/lib/time";
 import type { Room, ScheduleLock, ScheduleWithRelations } from "@/lib/types";
 
 interface Props {
@@ -43,7 +51,25 @@ interface EventProps {
 interface LockProps {
   lock: true;
   reason: string | null;
+  /** วันเวลาเต็ม เช่น "อ. 24 พ.ย. 2569 08:00–17:00" */
   rangeLabel: string;
+  /** แบบสั้นสำหรับแสดงในช่องปฏิทิน เช่น "08:00–17:00" หรือ "24/11 08:00 – 26/11 17:00" */
+  shortLabel: string;
+}
+
+/** "2026-11-24" → "24/11" */
+const dayMonth = (iso: string) => isoToBangkokDate(iso).slice(5).split("-").reverse().join("/");
+
+/** วันสุดท้ายของช่วงล็อก (จบเที่ยงคืนพอดี = นับเป็นวันก่อนหน้า) */
+const lastLockDay = (endIso: string) => isoToBangkokDate(new Date(new Date(endIso).getTime() - 1));
+
+/** "2026-11-24" → "2026-11-25" */
+const nextDay = (date: string) => new Date(Date.parse(`${date}T00:00:00Z`) + 24 * 3600 * 1000).toISOString().slice(0, 10);
+
+function shortLockLabel(startIso: string, endIso: string): string {
+  return isoToBangkokDate(startIso) === lastLockDay(endIso)
+    ? formatRange(startIso, endIso)
+    : `${dayMonth(startIso)} ${formatTime(startIso)} – ${dayMonth(endIso)} ${formatTime(endIso)}`;
 }
 
 export default function PublicCalendar({ rooms, teachers, canAdd = false }: Props) {
@@ -52,6 +78,8 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
   const [notice, setNotice] = useState<string | null>(null);
   // ช่วงที่ล็อกซึ่งโหลดมาล่าสุด (ใช้เช็กตอนคลิกวัน/ช่องเวลา)
   const locksRef = useRef<ScheduleLock[]>([]);
+  // ช่วงที่ล็อกในช่วงวันที่ที่กำลังแสดง (แสดงเป็นรายการเหนือปฏิทิน)
+  const [visibleLocks, setVisibleLocks] = useState<ScheduleLock[]>([]);
 
   // คลิกวัน (มุมมองเดือน) หรือช่องเวลา (มุมมองสัปดาห์/วัน) → ไปหน้าเพิ่มคาบสอน
   // dateStr: "YYYY-MM-DD" หรือ "YYYY-MM-DDTHH:MM:SS+07:00" (เป็นเวลาไทยเพราะตั้ง timeZone ไว้)
@@ -162,20 +190,37 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
       return [];
     }
     locksRef.current = data;
-    return data.map((l) => {
+    setVisibleLocks(data);
+    return data.flatMap((l) => {
       const extendedProps: LockProps = {
         lock: true,
         reason: l.reason,
         rangeLabel: formatDateTimeRange(l.start_time, l.end_time),
+        shortLabel: shortLockLabel(l.start_time, l.end_time),
       };
-      return {
-        id: `lock-${l.id}`,
-        start: l.start_time,
-        end: l.end_time,
-        display: "background",
-        classNames: ["fc-lock-event"],
-        extendedProps,
-      };
+      return [
+        // มุมมองสัปดาห์/วัน: พื้นหลังลายแดงตรงช่วงเวลาที่ล็อก
+        {
+          id: `lock-${l.id}`,
+          start: l.start_time,
+          end: l.end_time,
+          display: "background",
+          classNames: ["fc-lock-event"],
+          extendedProps,
+        },
+        // มุมมองเดือน/รายการ: แถบ "🔒 ล็อก" แบบทั้งวัน (มุมมองเดือนไม่แสดงพื้นหลังที่มีเวลา
+        // ส่วนมุมมองสัปดาห์/วันปิดแถวทั้งวันไว้ จึงไม่ซ้ำกัน)
+        {
+          id: `lock-day-${l.id}`,
+          allDay: true,
+          start: isoToBangkokDate(l.start_time),
+          end: nextDay(lastLockDay(l.end_time)),
+          backgroundColor: "#fee2e2",
+          borderColor: "#f87171",
+          textColor: "#991b1b",
+          extendedProps,
+        },
+      ];
     });
   }, []);
 
@@ -275,6 +320,19 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
       )}
       {notice && <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{notice}</p>}
 
+      {visibleLocks.length > 0 && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          <p className="font-semibold">🔒 ช่วงเวลาที่ล็อก (เปิดสอนไม่ได้)</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5">
+            {visibleLocks.map((l) => (
+              <li key={l.id}>
+                {formatDateTimeRange(l.start_time, l.end_time)} น.{l.reason ? ` — ${l.reason}` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {loadError && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
           โหลดข้อมูลไม่สำเร็จ: {loadError}
@@ -301,7 +359,14 @@ export default function PublicCalendar({ rooms, teachers, canAdd = false }: Prop
             eventSources={[fetchEvents, fetchLocks]}
             eventContent={renderEvent}
             eventClick={(arg) => {
-              if (arg.event.display !== "background") setSelected(arg.event.extendedProps as EventProps);
+              const lock = arg.event.extendedProps as Partial<LockProps>;
+              if (lock.lock) {
+                setNotice(
+                  `🔒 ช่วงเวลา ${lock.rangeLabel} น. ถูกล็อกไว้ ไม่สามารถเปิดสอนได้${lock.reason ? ` (${lock.reason})` : ""}`
+                );
+              } else {
+                setSelected(arg.event.extendedProps as EventProps);
+              }
             }}
             eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
             slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
@@ -373,11 +438,24 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function renderEvent(arg: EventContentArg) {
+  if ((arg.event.extendedProps as Partial<LockProps>).lock && arg.event.allDay) {
+    const l = arg.event.extendedProps as LockProps;
+    return (
+      <div
+        className="w-full cursor-pointer truncate px-1 py-0.5 text-[11px] font-semibold leading-tight"
+        title={`${l.rangeLabel} น.${l.reason ? ` — ${l.reason}` : ""}`}
+      >
+        🔒 ล็อก {l.shortLabel}
+        {l.reason ? <span className="font-normal"> · {l.reason}</span> : null}
+      </div>
+    );
+  }
   if (arg.event.display === "background") {
     const l = arg.event.extendedProps as LockProps;
     return (
-      <div className="p-0.5 text-[11px] font-semibold leading-tight text-red-800" title={l.rangeLabel}>
-        🔒 ล็อก{l.reason ? `: ${l.reason}` : ""}
+      <div className="p-0.5 text-[11px] font-semibold leading-tight text-red-800" title={`${l.rangeLabel} น.`}>
+        <div>🔒 ล็อก {l.shortLabel}</div>
+        {l.reason && <div className="font-normal">{l.reason}</div>}
       </div>
     );
   }
